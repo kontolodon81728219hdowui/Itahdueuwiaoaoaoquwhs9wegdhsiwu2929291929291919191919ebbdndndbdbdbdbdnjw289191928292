@@ -318,7 +318,7 @@ end
 local KEY_WHITELIST = {
     ["zevadenganteng"] = { "zevadenalt" },
     ["ardananjing"]    = { "andymunoz" },
-    ["48-3XYU"] = {" "},
+    ["z"] = {"zevadensatria"},
 }
 local function keyName(k)
     if k == nil then return "None" end

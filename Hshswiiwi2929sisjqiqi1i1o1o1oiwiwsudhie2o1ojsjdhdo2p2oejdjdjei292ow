@@ -1,12 +1,9 @@
 -- ============================================================
--- Zeva v8.2.5 — patched build
+-- Zeva v8.2.6 — patched build
 -- ============================================================
--- [C] fixes applied on top of v8.2.4:
---   - Split ESP Box into two independent toggles:
---       * "Box" -> just the outline
---       * "Filled Box" -> just the see-through fill
---   - Added "Fill Color" and "Fill Trans" to ESP Customization
---   - Removed old ESPFilled combo toggle in favor of the new split
+-- [C] fixes applied on top of v8.2.5:
+--   - Radar now has fully customizable colors
+--   - Added Radar Settings: Enemy Color, Team Color, Self Color
 -- ============================================================
 
 -- ============================================================
@@ -75,7 +72,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.5
+-- Zeva v8.2.6
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -461,7 +458,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.5", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.2.6", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -967,6 +964,7 @@ function StartScript(plf)
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
         Radar=false, RadarSize=140, RadarRange=200,
+        RadarEnemyColor=Color3.fromRGB(244,106,122), RadarTeamColor=Color3.fromRGB(120,220,165), RadarSelfColor=Color3.fromRGB(150,130,255),
         AntiAimEnabled=false, AntiAimMode="Static", AntiAimPitch=0, AntiAimYaw=180, AntiAimSpinSpeed=8,
         AutoBhop=false,
         FPSBooster=false, FPSOverlay=false,
@@ -1464,7 +1462,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.5", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.6", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -3057,6 +3055,9 @@ function StartScript(plf)
 
         local s7 = section(pages["settings"], "radar")
         toggle(s7, "Radar / Minimap", "Radar", false, function(v) cfg.Radar = v end)
+        colorRow(s7, "Enemy Color", "RadarEnemyColor")
+        colorRow(s7, "Team Color", "RadarTeamColor")
+        colorRow(s7, "Self Color", "RadarSelfColor")
         numInput(s7, "Size", "RadarSize", 140)
         numInput(s7, "Range", "RadarRange", 200)
 
@@ -3690,8 +3691,7 @@ function StartScript(plf)
             if pl ~= p then trackVel(pl, dt) end
         end
 
-        local cAim, cBox, cBone, cHealth, cDist = cfg.Aim, cfg.Box, cfg.Bone, cfg.Health, cfg.Dist
-        local cBoxFilled = cfg.BoxFilled
+        local cAim, cBox, cBoxFilled, cBone, cHealth, cDist = cfg.Aim, cfg.Box, cfg.BoxFilled, cfg.Bone, cfg.Health, cfg.Dist
         local cTracer, cLookTr = cfg.Tracer, cfg.LookTracer
         local cChams, cShowFov = cfg.Chams, cfg.ShowFov
         local cFovSize, cFovShape = cfg.FovSize, cfg.FovShape
@@ -4093,19 +4093,19 @@ function StartScript(plf)
                 selfLine.Size = UDim2.new(0, 2, 0, 8)
                 selfLine.AnchorPoint = Vector2.new(0.5, 1)
                 selfLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-                selfLine.BackgroundColor3 = TH.Accent
+                selfLine.BackgroundColor3 = cfg.RadarSelfColor
                 selfLine.BorderSizePixel = 0
                 round(selfLine, 1)
                 selfLine.ZIndex = 2
                 
                 local selfDot = Instance.new("Frame", selfContainer)
-                selfDot.Size, selfDot.BackgroundColor3, selfDot.BorderSizePixel = UDim2.new(0,6,0,6), TH.Accent, 0
+                selfDot.Size, selfDot.BackgroundColor3, selfDot.BorderSizePixel = UDim2.new(0,6,0,6), cfg.RadarSelfColor, 0
                 selfDot.AnchorPoint = Vector2.new(0.5, 0.5)
                 selfDot.Position = UDim2.new(0.5, 0, 0.5, 0)
                 round(selfDot, 3)
                 selfDot.ZIndex = 3
 
-                _G.__zeva_radarGui = {sg = sg, frame = frame, holder = holder, selfContainer = selfContainer, dots = {}, lastYaw = nil}
+                _G.__zeva_radarGui = {sg = sg, frame = frame, holder = holder, selfContainer = selfContainer, selfDot = selfDot, selfLine = selfLine, dots = {}, lastYaw = nil}
             end
             local rd = _G.__zeva_radarGui
             if rd.frame.Size.X.Offset ~= cfg.RadarSize then rd.frame.Size = UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize) end
@@ -4114,6 +4114,10 @@ function StartScript(plf)
             
             local targetCamYaw = math.atan2(camCF.LookVector.X, -camCF.LookVector.Z)
             if rd.lastYaw == nil then rd.lastYaw = targetCamYaw end
+            
+            if rd.selfDot then rd.selfDot.BackgroundColor3 = cfg.RadarSelfColor end
+            if rd.selfLine then rd.selfLine.BackgroundColor3 = cfg.RadarSelfColor end
+
             local diff = (targetCamYaw - rd.lastYaw + math.pi) % (math.pi * 2) - math.pi
             rd.lastYaw = rd.lastYaw + diff * math.min(1, dt * 12)
             local camYaw = rd.lastYaw
@@ -4168,7 +4172,7 @@ function StartScript(plf)
                                 dItem.container.Visible = true
                                 
                                 local isTeammate = cfg.TeamCheck and pl.Team and p.Team and pl.Team == p.Team
-                                local dotCol = isTeammate and TH.On or TH.Danger
+                                local dotCol = isTeammate and cfg.RadarTeamColor or cfg.RadarEnemyColor
                                 dItem.dot.BackgroundColor3 = dotCol
                                 dItem.aimLine.BackgroundColor3 = dotCol
 

@@ -1,9 +1,10 @@
 -- ============================================================
--- Zeva v8.26 — patched build
+-- Zeva v8.2.7 — patched build
 -- ============================================================
---  fixes applied on top of v8.2.5:
---   - Radar now has fully customizable colors(masih bug asu) 
---   - Added Radar Settings: Enemy Color, Team Color, Self Color
+-- [C] fixes applied on top of v8.2.6:
+--   - Removed AA camera pin (fixes "freecam" feel and broken mouse look)
+--   - Moved Radar to its own tab right under ESP
+--   - Fixed ESP Color swatches not updating when loading a config
 -- ============================================================
 
 -- ============================================================
@@ -72,7 +73,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.6
+-- Zeva v8.2.7
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -458,7 +459,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.6", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.2.7", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -1045,7 +1046,6 @@ function StartScript(plf)
     local aaYawAccum = 0
     local aaJitterPhase = 0
     local aaLastYaw = nil
-    local aaSavedCam = nil
     local aaOriginalNeckC0 = nil
     local lastFrameDt = 1/60
 
@@ -1325,7 +1325,6 @@ function StartScript(plf)
         aaYawAccum = 0
         aaJitterPhase = 0
         aaLastYaw = nil
-        aaSavedCam = nil
         local char = p.Character
         if char then
             local neck = char:FindFirstChild("Neck", true)
@@ -1462,7 +1461,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.6", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.7", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -1564,7 +1563,7 @@ function StartScript(plf)
     local tabColBottom = uCardH + 16 + 16
     local tabH = isPC and 32 or 28
     local tabPad = isPC and 4 or 3
-    local tabCount = 8
+    local tabCount = 9
     local settingsH = isPC and 34 or 30
 
     local tabHolder = Instance.new("ScrollingFrame", sidebar)
@@ -1891,7 +1890,7 @@ function StartScript(plf)
     profileBackdropBtn.MouseButton1Click:Connect(closeProfile)
 
     local TAB_LABELS = {
-        aim = "Aim", esp = "ESP", move = "Move",
+        aim = "Aim", esp = "ESP", radar = "Radar", move = "Move",
         perf = "Perf", set = "Set", body = "Body",
         target = "Target", settings = "Settings",
     }
@@ -2434,6 +2433,14 @@ function StartScript(plf)
             cfg[cfgKey] = ESP_PRESETS[idx]
             tw(sw, EASE.fast, {BackgroundColor3 = cfg[cfgKey]})
         end)
+        
+        regRefresh(cfgKey, function()
+            for i, col in ipairs(ESP_PRESETS) do
+                if col == cfg[cfgKey] then idx = i; break end
+            end
+            tw(sw, EASE.fast, {BackgroundColor3 = cfg[cfgKey]})
+        end)
+
         regFeature(label, BUILD_PAGE, r)
         return sw
     end
@@ -2527,8 +2534,8 @@ function StartScript(plf)
     local bindName = "ZevaAim_"..tostring(tick())
     local mainLoop
 
-    makeTab("aim"); makeTab("esp"); makeTab("move"); makeTab("perf"); makeTab("set"); makeTab("body"); makeTab("target"); makeTab("settings")
-    makePage("aim"); makePage("esp"); makePage("move"); makePage("perf"); makePage("set"); makePage("body"); makePage("target"); makePage("settings")
+    makeTab("aim"); makeTab("esp"); makeTab("radar"); makeTab("move"); makeTab("perf"); makeTab("set"); makeTab("body"); makeTab("target"); makeTab("settings")
+    makePage("aim"); makePage("esp"); makePage("radar"); makePage("move"); makePage("perf"); makePage("set"); makePage("body"); makePage("target"); makePage("settings")
 
     local selectedPartsArr = { "Head" }
     local selectedPartsDirty = false
@@ -2695,6 +2702,18 @@ function StartScript(plf)
         numInput(s3, "Health Thickness", "HealthThickness", 3)
         numInput(s3, "Tracer Thickness", "TracerThickness", 1)
         numInput(s3, "Font Size", "ESPFontSize", 12)
+    end
+
+    -- RADAR PAGE
+    do
+        BUILD_PAGE = "radar"
+        local s = section(pages["radar"], "radar settings")
+        toggle(s, "Radar / Minimap", "Radar", false, function(v) cfg.Radar = v end)
+        colorRow(s, "Enemy Color", "RadarEnemyColor")
+        colorRow(s, "Team Color", "RadarTeamColor")
+        colorRow(s, "Self Color", "RadarSelfColor")
+        numInput(s, "Size", "RadarSize", 140)
+        numInput(s, "Range", "RadarRange", 200)
     end
 
     -- MOVE PAGE
@@ -3053,14 +3072,6 @@ function StartScript(plf)
         toggle(s6, "Kill Stats Overlay", "KillStats", false, function(v) cfg.KillStats = v end)
         toggle(s6, "Kill Feed", "KillFeed", false, function(v) cfg.KillFeed = v end)
 
-        local s7 = section(pages["settings"], "radar")
-        toggle(s7, "Radar / Minimap", "Radar", false, function(v) cfg.Radar = v end)
-        colorRow(s7, "Enemy Color", "RadarEnemyColor")
-        colorRow(s7, "Team Color", "RadarTeamColor")
-        colorRow(s7, "Self Color", "RadarSelfColor")
-        numInput(s7, "Size", "RadarSize", 140)
-        numInput(s7, "Range", "RadarRange", 200)
-
         local s8 = section(pages["settings"], "danger zone")
         local cd = Instance.new("TextButton", s8)
         cd.Size, cd.BackgroundColor3, cd.BackgroundTransparency, cd.Text, cd.TextColor3, cd.Font, cd.TextSize =
@@ -3085,7 +3096,6 @@ function StartScript(plf)
             if mainLoop then pcall(function() mainLoop:Disconnect() end); mainLoop = nil end
             pcall(restoreAntiAim); pcall(fcStop); pcall(restoreFPSBooster); pcall(BH_restoreAll)
             pcall(function() RS:UnbindFromRenderStep(bindName) end)
-            pcall(function() RS:UnbindFromRenderStep(bindName .. "_AACam") end)
             disconnectAll()
             pcall(function() if glowStroke then glowStroke:Destroy() end end)
             pcall(function() if glow then glow:Destroy() end end)
@@ -3666,12 +3676,6 @@ function StartScript(plf)
         c.CFrame = c.CFrame:Lerp(CFrame.new(camPos, currentAimPos), alpha)
     end))
 
-    RS:BindToRenderStep(bindName .. "_AACam", 201, function()
-        if aaSavedCam and not root.Visible then
-            c.CFrame = aaSavedCam
-        end
-    end)
-
     local fpsFrames, fpsLast, fpsValue, pingValue = 0, tick(), 0, 0
     local chamsAccum = 0
     local killFeedSig = ""
@@ -3727,10 +3731,7 @@ function StartScript(plf)
             c.CFrame = fcCFrame
         end
         if cfg.AntiAimEnabled then
-            aaSavedCam = c.CFrame
             applyAntiAim(dt)
-        else
-            aaSavedCam = nil
         end
 
         local wantFovMode = "none"
@@ -3776,7 +3777,6 @@ function StartScript(plf)
             end
         end
         if cfg.Spin and not cfg.AntiAimEnabled and p.Character and p.Character.PrimaryPart then
-            if not aaSavedCam then aaSavedCam = c.CFrame end
             local spHrp = p.Character:FindFirstChild("HumanoidRootPart")
             if spHrp then
                 local spVel = spHrp.AssemblyLinearVelocity

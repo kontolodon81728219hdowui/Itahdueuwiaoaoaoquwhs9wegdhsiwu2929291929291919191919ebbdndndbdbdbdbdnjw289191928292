@@ -1,8 +1,8 @@
 -- ============================================================
--- Zeva v8.2.6 — patched build
+-- Zeva v8.26 — patched build
 -- ============================================================
--- [C] fixes applied on top of v8.2.5:
---   - Radar now has fully customizable colors
+--  fixes applied on top of v8.2.5:
+--   - Radar now has fully customizable colors(masih bug asu) 
 --   - Added Radar Settings: Enemy Color, Team Color, Self Color
 -- ============================================================
 

@@ -1,9 +1,10 @@
 -- ============================================================
--- Zeva v8.2.8 — patched build
+-- Zeva v8.2.7 — patched build
 -- ============================================================
--- [C] fixes applied on top of v8.2.7:
---   - Added Name ESP toggle, color, and size to the ESP tab
---   - Name ESP renders right above the hitbox
+-- [C] fixes applied on top of v8.2.6:
+--   - Removed AA camera pin (fixes "freecam" feel and broken mouse look)
+--   - Moved Radar to its own tab right under ESP
+--   - Fixed ESP Color swatches not updating when loading a config
 -- ============================================================
 
 -- ============================================================
@@ -72,7 +73,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.8
+-- Zeva v8.2.7
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -458,7 +459,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.8", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.2.7", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -942,7 +943,7 @@ function StartScript(plf)
     local cfg = {
         Trig=false, Aim=false, WallCheck=false, Chams=false,
         Dly=0.02, Smth=0.35, Bone=false, Box=false, Health=false,
-        Dist=false, TeamCheck=false, KOCheck=true, NameESP=false,
+        Dist=false, TeamCheck=false, KOCheck=true,
         Pred=0.12, AutoPred=true, PredScale=1.0,
         Spin=false, SpinSpeed=50, Noclip=false,
         SelectedParts={["Head"]=true}, UseNearest=false, PartColors={},
@@ -961,7 +962,6 @@ function StartScript(plf)
         BoxColor=Color3.fromRGB(255,255,255), BoneColor=Color3.fromRGB(255,255,255),
         HealthColor=Color3.fromRGB(0,255,0), DistanceColor=Color3.fromRGB(255,255,255),
         TracerColor=Color3.fromRGB(255,255,255), LookTracerColor=Color3.fromRGB(255,0,0),
-        NameColor=Color3.fromRGB(255,255,255), NameSize=12,
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
         Radar=false, RadarSize=140, RadarRange=200,
@@ -1461,7 +1461,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.8", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.7", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -2684,7 +2684,6 @@ function StartScript(plf)
         toggle(s, "Bones", "Bone", false, function(v) cfg.Bone = v end)
         toggle(s, "Health Bar", "Health", false, function(v) cfg.Health = v end)
         toggle(s, "Distance", "Dist", false, function(v) cfg.Dist = v end)
-        toggle(s, "Name ESP", "NameESP", false, function(v) cfg.NameESP = v end)
         toggle(s, "Hit Chams", "Chams", false, function(v) cfg.Chams = v end)
         toggle(s, "Tracer", "Tracer", false, function(v) cfg.Tracer = v end)
         toggle(s, "Look Tracer", "LookTracer", false, function(v) cfg.LookTracer = v end)
@@ -2697,13 +2696,11 @@ function StartScript(plf)
         slider(s3, "Fill Trans", "BoxFilledTransparency", 0, 1, 0.5, function(v) cfg.BoxFilledTransparency = v end, 2)
         colorRow(s3, "Bone Color", "BoneColor")
         colorRow(s3, "Health Color", "HealthColor"); colorRow(s3, "Distance Color", "DistanceColor")
-        colorRow(s3, "Name Color", "NameColor"); colorRow(s3, "Tracer Color", "TracerColor")
-        colorRow(s3, "LookTracer Color", "LookTracerColor")
+        colorRow(s3, "Tracer Color", "TracerColor"); colorRow(s3, "LookTracer Color", "LookTracerColor")
         numInput(s3, "Box Thickness", "BoxThickness", 1)
         numInput(s3, "Bone Thickness", "BoneThickness", 1)
         numInput(s3, "Health Thickness", "HealthThickness", 3)
         numInput(s3, "Tracer Thickness", "TracerThickness", 1)
-        numInput(s3, "Name Size", "NameSize", 12)
         numInput(s3, "Font Size", "ESPFontSize", 12)
     end
 
@@ -3507,7 +3504,7 @@ function StartScript(plf)
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
-        local d = { L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText() }
+        local d = { L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), D=mkText(), T=mkLine(), LT=mkLine() }
         if d.B then d.B.Thickness, d.B.Color, d.B.Filled = cfg.BoxThickness, cfg.BoxColor, false end
         if d.BF then d.BF.Thickness, d.BF.Color, d.BF.Filled, d.BF.Transparency = 0, cfg.BoxFilledColor, true, cfg.BoxFilledTransparency end
         if d.HB then d.HB.Thickness, d.HB.Color = cfg.HealthThickness, cfg.HealthColor end
@@ -3515,7 +3512,6 @@ function StartScript(plf)
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
-        if d.Name then d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor end
         dr[pl] = d
         for i = 1, BONE_PAIRS_COUNT do
             local l = mkLine()
@@ -3699,7 +3695,7 @@ function StartScript(plf)
             if pl ~= p then trackVel(pl, dt) end
         end
 
-        local cAim, cBox, cBoxFilled, cBone, cHealth, cDist, cName = cfg.Aim, cfg.Box, cfg.BoxFilled, cfg.Bone, cfg.Health, cfg.Dist, cfg.NameESP
+        local cAim, cBox, cBoxFilled, cBone, cHealth, cDist = cfg.Aim, cfg.Box, cfg.BoxFilled, cfg.Bone, cfg.Health, cfg.Dist
         local cTracer, cLookTr = cfg.Tracer, cfg.LookTracer
         local cChams, cShowFov = cfg.Chams, cfg.ShowFov
         local cFovSize, cFovShape = cfg.FovSize, cfg.FovShape
@@ -3708,7 +3704,6 @@ function StartScript(plf)
         local cBoneCol, cBoneTh = cfg.BoneColor, cfg.BoneThickness
         local cHpCol, cHpTh = cfg.HealthColor, cfg.HealthThickness
         local cDistCol, cFontSz = cfg.DistanceColor, cfg.ESPFontSize
-        local cNameCol, cNameSz = cfg.NameColor, cfg.NameSize
         local cTrCol, cTrTh = cfg.TracerColor, cfg.TracerThickness
         local cLtCol, cLtTh = cfg.LookTracerColor, cfg.LookTracerThickness
 
@@ -3815,7 +3810,7 @@ function StartScript(plf)
         end
         updateChams()
 
-        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone or cName)
+        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone)
         for pl, d in pairs(dr) do
             local ch = pl.Character
             local visible = anyESP and ch and v_cached(pl)
@@ -3833,7 +3828,6 @@ function StartScript(plf)
                         local ht = math.abs(bS.Y - tS.Y); local wd = ht / 1.6
                         local tSy = tS.Y
                         local psx, psy = ps.X, ps.Y
-                        
                         if d.B then
                             if cBox then
                                 if not d.B.Visible then d.B.Visible = true end
@@ -3850,17 +3844,6 @@ function StartScript(plf)
                                 d.BF.Color = cBoxFillCol
                                 d.BF.Transparency = cBoxFillTrans
                             elseif d.BF.Visible then d.BF.Visible = false end
-                        end
-                        if d.Name then
-                            if cName then
-                                if not d.Name.Visible then d.Name.Visible = true end
-                                d.Name.Text = pl.DisplayName
-                                d.Name.Position = Vector2.new(psx, tSy - cNameSz - 4)
-                                d.Name.Color = cNameCol
-                                d.Name.Size = cNameSz
-                                d.Name.Center = true
-                                d.Name.Outline = true
-                            elseif d.Name.Visible then d.Name.Visible = false end
                         end
                         if d.HB and d.HM then
                             if cHealth then
@@ -3936,7 +3919,6 @@ function StartScript(plf)
                     else
                         if d.B and d.B.Visible then d.B.Visible = false end
                         if d.BF and d.BF.Visible then d.BF.Visible = false end
-                        if d.Name and d.Name.Visible then d.Name.Visible = false end
                         if d.D and d.D.Visible then d.D.Visible = false end
                         if d.HB and d.HB.Visible then d.HB.Visible = false end
                         if d.HM and d.HM.Visible then d.HM.Visible = false end
@@ -3951,7 +3933,6 @@ function StartScript(plf)
             else
                 if d.B and d.B.Visible then d.B.Visible = false end
                 if d.BF and d.BF.Visible then d.BF.Visible = false end
-                if d.Name and d.Name.Visible then d.Name.Visible = false end
                 if d.D and d.D.Visible then d.D.Visible = false end
                 if d.HB and d.HB.Visible then d.HB.Visible = false end
                 if d.HM and d.HM.Visible then d.HM.Visible = false end
@@ -4281,7 +4262,6 @@ function StartScript(plf)
         if d then
             pcall(function() if d.B then d.B:Remove() end end)
             pcall(function() if d.BF then d.BF:Remove() end end)
-            pcall(function() if d.Name then d.Name:Remove() end end)
             pcall(function() if d.HB then d.HB:Remove() end end)
             pcall(function() if d.HM then d.HM:Remove() end end)
             pcall(function() if d.D then d.D:Remove() end end)

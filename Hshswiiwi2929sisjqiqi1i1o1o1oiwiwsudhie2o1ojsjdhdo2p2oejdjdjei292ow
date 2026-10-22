@@ -1,15 +1,12 @@
 -- ============================================================
--- Zeva v8.2.3 — patched build
+-- Zeva v8.2.4 — patched build
 -- ============================================================
--- [C] fixes applied on top of v8.2.2:
---   - Radar rebuilt: smooth yaw interpolation, correct relative math
---   - Radar now draws aim-lines showing exactly where each player is facing
---   - Radar self-dot now has an arrow showing your own facing direction
---   - Anti-Aim & Spinbot now disable Humanoid.AutoRotate
---   - Anti-Aim & Spinbot now preserve velocity (stops map jitter/physics fights)
---   - Added camera-state pin (RenderStep 201) so your view stays still
---     while the server sees your character spinning/AA'ing
---   - Aimlock RenderStep moved to 202 to run cleanly on top of camera pin
+-- [C] fixes applied on top of v8.2.3:
+--   - Filled ESP Box now has 0.5 transparency (see-through color)
+--   - Radar teammates = green, enemies = red, self = accent color
+--   - Magic Bullet (BigHead) now dynamically expands parts selected
+--     in the Body tab (R6 & R15 mapped)
+--   - Magic Bullet instantly restores unselected body parts
 -- ============================================================
 
 -- ============================================================
@@ -78,7 +75,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.3
+-- Zeva v8.2.4
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -464,7 +461,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.3", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.2.4", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -1057,8 +1054,25 @@ function StartScript(plf)
     -- MAGIC BULLET
     local bhCache = {}
     local bhCharSet = {}
-    local BH_NAMES = { Head = true, Hitbox = true, ["Head Hitbox"] = true }
-    local function bh_isTarget(part) return part:IsA("BasePart") and BH_NAMES[part.Name] == true end
+    local BH_R6_TO_R15 = {
+        ["Head"] = {"Head", "Hitbox", "Head Hitbox"},
+        ["Torso"] = {"Torso", "UpperTorso", "LowerTorso"},
+        ["Left Arm"] = {"Left Arm", "LeftUpperArm", "LeftLowerArm", "LeftHand"},
+        ["Right Arm"] = {"Right Arm", "RightUpperArm", "RightLowerArm", "RightHand"},
+        ["Left Leg"] = {"Left Leg", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot"},
+        ["Right Leg"] = {"Right Leg", "RightUpperLeg", "RightLowerLeg", "RightFoot"},
+    }
+    local function bh_isTarget(part)
+        if not part:IsA("BasePart") then return false end
+        for r6Name, r15Names in pairs(BH_R6_TO_R15) do
+            if cfg.SelectedParts[r6Name] then
+                for _, r15Name in ipairs(r15Names) do
+                    if part.Name == r15Name then return true end
+                end
+            end
+        end
+        return false
+    end
     local function bh_snapshot(part)
         if bhCache[part] then return end
         local snap = {
@@ -1450,7 +1464,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.3", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.4", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -3600,25 +3614,23 @@ function StartScript(plf)
             if bh_valid(pl) then
                 local ch = pl.Character
                 if ch then
-                    local set = bhCharSet[ch]
-                    if set then
-                        local n = cfg.BigHeadSizeNum or 20
-                        local target = Vector3.new(n, n, n)
-                        for i = 1, #set do
-                            local part = set[i]
-                            if part and part.Parent then
-                                if part.Size ~= target then part.Size = target end
-                                part.CanCollide = false; part.CanQuery = true; part.CanTouch = false
-                                part.Massless = true; part.Transparency = 1; part.LocalTransparencyModifier = 1
+                    local n = cfg.BigHeadSizeNum or 20
+                    local target = Vector3.new(n, n, n)
+                    local newSet = {}
+                    for _, d in ipairs(ch:GetDescendants()) do
+                        if d:IsA("BasePart") then
+                            if bh_isTarget(d) then
+                                if not bhCache[d] then bh_expand(d) end
+                                if d.Size ~= target then d.Size = target end
+                                d.CanCollide = false; d.CanQuery = true; d.CanTouch = false
+                                d.Massless = true; d.Transparency = 1; d.LocalTransparencyModifier = 1
+                                table.insert(newSet, d)
+                            elseif bhCache[d] then
+                                bh_restore(d)
                             end
                         end
-                    else
-                        local newSet = {}
-                        for _, d in ipairs(ch:GetDescendants()) do
-                            if bh_isTarget(d) then bh_expand(d); table.insert(newSet, d) end
-                        end
-                        bhCharSet[ch] = newSet
                     end
+                    bhCharSet[ch] = newSet
                 end
             end
         end
@@ -3815,7 +3827,10 @@ function StartScript(plf)
                                 if not d.B.Visible then d.B.Visible = true end
                                 d.B.Size = Vector2.new(wd, ht)
                                 d.B.Position = Vector2.new(psx - wd*0.5, tSy)
-                                d.B.Color = cBoxCol; d.B.Thickness = cBoxTh; d.B.Filled = cFill
+                                d.B.Color = cBoxCol
+                                d.B.Thickness = cBoxTh
+                                d.B.Filled = cFill
+                                d.B.Transparency = cFill and 0.5 or 1
                             elseif d.B.Visible then d.B.Visible = false end
                         end
                         if d.HB and d.HM then
@@ -4113,7 +4128,6 @@ function StartScript(plf)
                                     aimLine.Size = UDim2.new(0, 2, 0, 10)
                                     aimLine.AnchorPoint = Vector2.new(0.5, 1)
                                     aimLine.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                    aimLine.BackgroundColor3 = TH.Danger
                                     aimLine.BorderSizePixel = 0
                                     round(aimLine, 1)
                                     aimLine.ZIndex = 2
@@ -4122,7 +4136,6 @@ function StartScript(plf)
                                     dot.Size = UDim2.new(0, 6, 0, 6)
                                     dot.AnchorPoint = Vector2.new(0.5, 0.5)
                                     dot.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                    dot.BackgroundColor3 = TH.Danger
                                     dot.BorderSizePixel = 0
                                     round(dot, 3)
                                     dot.ZIndex = 3
@@ -4140,6 +4153,11 @@ function StartScript(plf)
                                 dItem.container.Position = UDim2.new(0, sx, 0, sy)
                                 dItem.container.Visible = true
                                 
+                                local isTeammate = cfg.TeamCheck and pl.Team and p.Team and pl.Team == p.Team
+                                local dotCol = isTeammate and TH.On or TH.Danger
+                                dItem.dot.BackgroundColor3 = dotCol
+                                dItem.aimLine.BackgroundColor3 = dotCol
+
                                 local look = hrp.CFrame.LookVector
                                 local pAimAngle = math.atan2(look.X, -look.Z)
                                 local relAimAngle = pAimAngle - camYaw

@@ -1,10 +1,11 @@
 -- ============================================================
--- Zeva v8.2.7 — patched build
+-- Zeva v8.3.0 — patched build
 -- ============================================================
--- [C] fixes applied on top of v8.2.6:
---   - Removed AA camera pin (fixes "freecam" feel and broken mouse look)
---   - Moved Radar to its own tab right under ESP
---   - Fixed ESP Color swatches not updating when loading a config
+-- [C] fixes applied on top of v8.2.9:
+--   - Removed PERF tab entirely
+--   - Removed FPS Booster feature
+--   - Moved Free Cam to MOVE tab
+--   - Moved FPS/Ping Overlay to SETTINGS tab
 -- ============================================================
 
 -- ============================================================
@@ -73,7 +74,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.7
+-- Zeva v8.3.0
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -459,7 +460,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.7", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.3.0", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -943,7 +944,7 @@ function StartScript(plf)
     local cfg = {
         Trig=false, Aim=false, WallCheck=false, Chams=false,
         Dly=0.02, Smth=0.35, Bone=false, Box=false, Health=false,
-        Dist=false, TeamCheck=false, KOCheck=true,
+        Dist=false, TeamCheck=false, KOCheck=true, NameESP=false,
         Pred=0.12, AutoPred=true, PredScale=1.0,
         Spin=false, SpinSpeed=50, Noclip=false,
         SelectedParts={["Head"]=true}, UseNearest=false, PartColors={},
@@ -962,13 +963,14 @@ function StartScript(plf)
         BoxColor=Color3.fromRGB(255,255,255), BoneColor=Color3.fromRGB(255,255,255),
         HealthColor=Color3.fromRGB(0,255,0), DistanceColor=Color3.fromRGB(255,255,255),
         TracerColor=Color3.fromRGB(255,255,255), LookTracerColor=Color3.fromRGB(255,0,0),
+        NameColor=Color3.fromRGB(255,255,255), NameSize=12,
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
         Radar=false, RadarSize=140, RadarRange=200,
         RadarEnemyColor=Color3.fromRGB(244,106,122), RadarTeamColor=Color3.fromRGB(120,220,165), RadarSelfColor=Color3.fromRGB(150,130,255),
         AntiAimEnabled=false, AntiAimMode="Static", AntiAimPitch=0, AntiAimYaw=180, AntiAimSpinSpeed=8,
         AutoBhop=false,
-        FPSBooster=false, FPSOverlay=false,
+        FPSOverlay=false,
         FreeCam=false, FreeCamSpeed=60,
         BigHead=false, BigHeadSizeNum=20,
         BigHeadKey=nil, BigHeadToggleMode=false, BigHeadHeld=false, BigHeadToggled=false,
@@ -1162,75 +1164,6 @@ function StartScript(plf)
     end
     function BH_restoreAll() for char in pairs(bhCharSet) do bh_restoreCharacter(char) end end
     local lastJumpFire = 0
-
-    -- FPS BOOSTER
-    local fpsBoosted = false
-    local fpsConns = nil
-    local fpsRevert = {}
-    local function _saveSet(obj, prop, newValue)
-        if not obj then return end
-        local ok, orig = pcall(function() return obj[prop] end)
-        if not ok then return end
-        table.insert(fpsRevert, {obj, prop, orig})
-        pcall(function() obj[prop] = newValue end)
-    end
-    local function stripPerf(obj)
-        if not obj then return end
-        if obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Smoke")
-           or obj:IsA("Fire") or obj:IsA("Sparkles") or obj:IsA("Explosion") or obj:IsA("Beam") then
-            if obj.Enabled then _saveSet(obj, "Enabled", false) end
-        elseif obj:IsA("PostEffect") then
-            if obj.Enabled then _saveSet(obj, "Enabled", false) end
-        elseif obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") then
-            if obj.Enabled then _saveSet(obj, "Enabled", false) end
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            if obj.Transparency < 1 then _saveSet(obj, "Transparency", 1) end
-        elseif obj:IsA("BasePart") then
-            if obj.CastShadow then _saveSet(obj, "CastShadow", false) end
-        end
-    end
-    local function applyFPSBooster()
-        if fpsBoosted then return end
-        fpsBoosted = true
-        local sweep = workspace:GetDescendants()
-        for i = 1, #sweep do stripPerf(sweep[i]) end
-        sweep = nil
-        for _, oo in ipairs(L:GetChildren()) do
-            if oo:IsA("PostEffect") then _saveSet(oo, "Enabled", false) end
-            if oo:IsA("Atmosphere") then _saveSet(oo, "Density", 0) end
-            if oo:IsA("Clouds") then _saveSet(oo, "Enabled", false) end
-        end
-        _saveSet(L, "GlobalShadows", false); _saveSet(L, "FogEnd", 100000)
-        _saveSet(L, "ShadowSoftness", 0); _saveSet(L, "EnvironmentDiffuseScale", 0)
-        _saveSet(L, "EnvironmentSpecularScale", 0); _saveSet(L, "Brightness", 3)
-        _saveSet(L, "GlobalWind", Vector3.zero)
-        local terr = workspace:FindFirstChildOfClass("Terrain")
-        if terr then
-            _saveSet(terr, "WaterWaveSize", 0); _saveSet(terr, "WaterTransparency", 1); _saveSet(terr, "WaterReflectance", 0)
-        end
-        fpsConns = {
-            ws = workspace.DescendantAdded:Connect(stripPerf),
-            light = L.ChildAdded:Connect(function(oo)
-                if oo:IsA("PostEffect") then _saveSet(oo, "Enabled", false) end
-                if oo:IsA("Atmosphere") then _saveSet(oo, "Density", 0) end
-                if oo:IsA("Clouds") then _saveSet(oo, "Enabled", false) end
-            end),
-        }
-    end
-    local function restoreFPSBooster()
-        if not fpsBoosted then return end
-        fpsBoosted = false
-        if fpsConns then
-            pcall(function() fpsConns.ws:Disconnect() end)
-            pcall(function() fpsConns.light:Disconnect() end)
-            fpsConns = nil
-        end
-        for i = #fpsRevert, 1, -1 do
-            local r = fpsRevert[i]
-            pcall(function() if r[1] and r[1].Parent then r[1][r[2]] = r[3] end end)
-        end
-        fpsRevert = {}
-    end
 
     -- FREE CAM
     local fcCFrame, fcControlsDisabled
@@ -1461,7 +1394,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.7", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.3.0", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -1563,7 +1496,7 @@ function StartScript(plf)
     local tabColBottom = uCardH + 16 + 16
     local tabH = isPC and 32 or 28
     local tabPad = isPC and 4 or 3
-    local tabCount = 9
+    local tabCount = 8
     local settingsH = isPC and 34 or 30
 
     local tabHolder = Instance.new("ScrollingFrame", sidebar)
@@ -1891,8 +1824,7 @@ function StartScript(plf)
 
     local TAB_LABELS = {
         aim = "Aim", esp = "ESP", radar = "Radar", move = "Move",
-        perf = "Perf", set = "Set", body = "Body",
-        target = "Target", settings = "Settings",
+        set = "Set", body = "Body", target = "Target", settings = "Settings",
     }
 
     local function setTab(name)
@@ -2534,8 +2466,8 @@ function StartScript(plf)
     local bindName = "ZevaAim_"..tostring(tick())
     local mainLoop
 
-    makeTab("aim"); makeTab("esp"); makeTab("radar"); makeTab("move"); makeTab("perf"); makeTab("set"); makeTab("body"); makeTab("target"); makeTab("settings")
-    makePage("aim"); makePage("esp"); makePage("radar"); makePage("move"); makePage("perf"); makePage("set"); makePage("body"); makePage("target"); makePage("settings")
+    makeTab("aim"); makeTab("esp"); makeTab("radar"); makeTab("move"); makeTab("set"); makeTab("body"); makeTab("target"); makeTab("settings")
+    makePage("aim"); makePage("esp"); makePage("radar"); makePage("move"); makePage("set"); makePage("body"); makePage("target"); makePage("settings")
 
     local selectedPartsArr = { "Head" }
     local selectedPartsDirty = false
@@ -2684,6 +2616,7 @@ function StartScript(plf)
         toggle(s, "Bones", "Bone", false, function(v) cfg.Bone = v end)
         toggle(s, "Health Bar", "Health", false, function(v) cfg.Health = v end)
         toggle(s, "Distance", "Dist", false, function(v) cfg.Dist = v end)
+        toggle(s, "Name ESP", "NameESP", false, function(v) cfg.NameESP = v end)
         toggle(s, "Hit Chams", "Chams", false, function(v) cfg.Chams = v end)
         toggle(s, "Tracer", "Tracer", false, function(v) cfg.Tracer = v end)
         toggle(s, "Look Tracer", "LookTracer", false, function(v) cfg.LookTracer = v end)
@@ -2696,11 +2629,13 @@ function StartScript(plf)
         slider(s3, "Fill Trans", "BoxFilledTransparency", 0, 1, 0.5, function(v) cfg.BoxFilledTransparency = v end, 2)
         colorRow(s3, "Bone Color", "BoneColor")
         colorRow(s3, "Health Color", "HealthColor"); colorRow(s3, "Distance Color", "DistanceColor")
-        colorRow(s3, "Tracer Color", "TracerColor"); colorRow(s3, "LookTracer Color", "LookTracerColor")
+        colorRow(s3, "Name Color", "NameColor"); colorRow(s3, "Tracer Color", "TracerColor")
+        colorRow(s3, "LookTracer Color", "LookTracerColor")
         numInput(s3, "Box Thickness", "BoxThickness", 1)
         numInput(s3, "Bone Thickness", "BoneThickness", 1)
         numInput(s3, "Health Thickness", "HealthThickness", 3)
         numInput(s3, "Tracer Thickness", "TracerThickness", 1)
+        numInput(s3, "Name Size", "NameSize", 12)
         numInput(s3, "Font Size", "ESPFontSize", 12)
     end
 
@@ -2749,18 +2684,8 @@ function StartScript(plf)
         slider(aa, "AA Pitch", "AntiAimPitch", -89, 89, 0, function(v) cfg.AntiAimPitch = v end)
         slider(aa, "AA Yaw", "AntiAimYaw", 0, 360, 180, function(v) cfg.AntiAimYaw = v end)
         slider(aa, "AA Spin Speed", "AntiAimSpinSpeed", 0, 45, 8, function(v) cfg.AntiAimSpinSpeed = v end)
-    end
-
-    -- PERF PAGE
-    do
-        BUILD_PAGE = "perf"
-        local s = section(pages["perf"], "performance")
-        toggle(s, "FPS Booster", "FPSBooster", false, function(v)
-            cfg.FPSBooster = v
-            if v then applyFPSBooster() else restoreFPSBooster() end
-        end)
-        toggle(s, "FPS / Ping Overlay", "FPSOverlay", false, function(v) cfg.FPSOverlay = v end)
-        local fc = section(pages["perf"], "free cam")
+        
+        local fc = section(pages["move"], "free cam")
         toggle(fc, "Free Cam", "FreeCam", false, function(v) cfg.FreeCam = v; if v then fcStart() else fcStop() end end)
         slider(fc, "Free Cam Speed", "FreeCamSpeed", 20, 200, 60, function(v) cfg.FreeCamSpeed = v end)
     end
@@ -2955,7 +2880,6 @@ function StartScript(plf)
             cfg.BigHeadHeld = false; cfg.BigHeadToggled = false
             if restoreAntiAim then restoreAntiAim() end
             if BH_restoreAll then BH_restoreAll() end
-            if restoreFPSBooster then restoreFPSBooster() end
             if fcStop then fcStop() end
             applyAccent(cfg.AccentColor)
             if plf == "PC" then setHintKey(cfg.HideKey) end
@@ -3071,6 +2995,7 @@ function StartScript(plf)
         local s6 = section(pages["settings"], "overlays")
         toggle(s6, "Kill Stats Overlay", "KillStats", false, function(v) cfg.KillStats = v end)
         toggle(s6, "Kill Feed", "KillFeed", false, function(v) cfg.KillFeed = v end)
+        toggle(s6, "FPS / Ping Overlay", "FPSOverlay", false, function(v) cfg.FPSOverlay = v end)
 
         local s8 = section(pages["settings"], "danger zone")
         local cd = Instance.new("TextButton", s8)
@@ -3094,7 +3019,7 @@ function StartScript(plf)
 
         local function teardown()
             if mainLoop then pcall(function() mainLoop:Disconnect() end); mainLoop = nil end
-            pcall(restoreAntiAim); pcall(fcStop); pcall(restoreFPSBooster); pcall(BH_restoreAll)
+            pcall(restoreAntiAim); pcall(fcStop); pcall(BH_restoreAll)
             pcall(function() RS:UnbindFromRenderStep(bindName) end)
             disconnectAll()
             pcall(function() if glowStroke then glowStroke:Destroy() end end)
@@ -3504,7 +3429,7 @@ function StartScript(plf)
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
-        local d = { L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), D=mkText(), T=mkLine(), LT=mkLine() }
+        local d = { L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText() }
         if d.B then d.B.Thickness, d.B.Color, d.B.Filled = cfg.BoxThickness, cfg.BoxColor, false end
         if d.BF then d.BF.Thickness, d.BF.Color, d.BF.Filled, d.BF.Transparency = 0, cfg.BoxFilledColor, true, cfg.BoxFilledTransparency end
         if d.HB then d.HB.Thickness, d.HB.Color = cfg.HealthThickness, cfg.HealthColor end
@@ -3512,6 +3437,7 @@ function StartScript(plf)
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
+        if d.Name then d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor; d.Name.Outline = true; d.Name.OutlineColor = Color3.new(0,0,0) end
         dr[pl] = d
         for i = 1, BONE_PAIRS_COUNT do
             local l = mkLine()
@@ -3695,7 +3621,7 @@ function StartScript(plf)
             if pl ~= p then trackVel(pl, dt) end
         end
 
-        local cAim, cBox, cBoxFilled, cBone, cHealth, cDist = cfg.Aim, cfg.Box, cfg.BoxFilled, cfg.Bone, cfg.Health, cfg.Dist
+        local cAim, cBox, cBoxFilled, cBone, cHealth, cDist, cName = cfg.Aim, cfg.Box, cfg.BoxFilled, cfg.Bone, cfg.Health, cfg.Dist, cfg.NameESP
         local cTracer, cLookTr = cfg.Tracer, cfg.LookTracer
         local cChams, cShowFov = cfg.Chams, cfg.ShowFov
         local cFovSize, cFovShape = cfg.FovSize, cfg.FovShape
@@ -3704,6 +3630,7 @@ function StartScript(plf)
         local cBoneCol, cBoneTh = cfg.BoneColor, cfg.BoneThickness
         local cHpCol, cHpTh = cfg.HealthColor, cfg.HealthThickness
         local cDistCol, cFontSz = cfg.DistanceColor, cfg.ESPFontSize
+        local cNameCol, cNameSz = cfg.NameColor, cfg.NameSize
         local cTrCol, cTrTh = cfg.TracerColor, cfg.TracerThickness
         local cLtCol, cLtTh = cfg.LookTracerColor, cfg.LookTracerThickness
 
@@ -3810,7 +3737,7 @@ function StartScript(plf)
         end
         updateChams()
 
-        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone)
+        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone or cName)
         for pl, d in pairs(dr) do
             local ch = pl.Character
             local visible = anyESP and ch and v_cached(pl)
@@ -3828,6 +3755,7 @@ function StartScript(plf)
                         local ht = math.abs(bS.Y - tS.Y); local wd = ht / 1.6
                         local tSy = tS.Y
                         local psx, psy = ps.X, ps.Y
+                        
                         if d.B then
                             if cBox then
                                 if not d.B.Visible then d.B.Visible = true end
@@ -3844,6 +3772,28 @@ function StartScript(plf)
                                 d.BF.Color = cBoxFillCol
                                 d.BF.Transparency = cBoxFillTrans
                             elseif d.BF.Visible then d.BF.Visible = false end
+                        end
+                        if d.Name then
+                            if cName then
+                                local head = ch:FindFirstChild("Head")
+                                if head then
+                                    local hp, hon = c:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
+                                    if hon and hp.Z > 0 then
+                                        d.Name.Visible = true
+                                        d.Name.Text = pl.DisplayName
+                                        d.Name.Position = Vector2.new(hp.X, hp.Y)
+                                        d.Name.Color = cNameCol
+                                        d.Name.Size = cNameSz
+                                        d.Name.Center = true
+                                        d.Name.Outline = true
+                                        d.Name.OutlineColor = Color3.new(0, 0, 0)
+                                    else
+                                        d.Name.Visible = false
+                                    end
+                                else
+                                    d.Name.Visible = false
+                                end
+                            elseif d.Name.Visible then d.Name.Visible = false end
                         end
                         if d.HB and d.HM then
                             if cHealth then
@@ -3919,6 +3869,7 @@ function StartScript(plf)
                     else
                         if d.B and d.B.Visible then d.B.Visible = false end
                         if d.BF and d.BF.Visible then d.BF.Visible = false end
+                        if d.Name and d.Name.Visible then d.Name.Visible = false end
                         if d.D and d.D.Visible then d.D.Visible = false end
                         if d.HB and d.HB.Visible then d.HB.Visible = false end
                         if d.HM and d.HM.Visible then d.HM.Visible = false end
@@ -3933,6 +3884,7 @@ function StartScript(plf)
             else
                 if d.B and d.B.Visible then d.B.Visible = false end
                 if d.BF and d.BF.Visible then d.BF.Visible = false end
+                if d.Name and d.Name.Visible then d.Name.Visible = false end
                 if d.D and d.D.Visible then d.D.Visible = false end
                 if d.HB and d.HB.Visible then d.HB.Visible = false end
                 if d.HM and d.HM.Visible then d.HM.Visible = false end
@@ -4262,6 +4214,7 @@ function StartScript(plf)
         if d then
             pcall(function() if d.B then d.B:Remove() end end)
             pcall(function() if d.BF then d.BF:Remove() end end)
+            pcall(function() if d.Name then d.Name:Remove() end end)
             pcall(function() if d.HB then d.HB:Remove() end end)
             pcall(function() if d.HM then d.HM:Remove() end end)
             pcall(function() if d.D then d.D:Remove() end end)

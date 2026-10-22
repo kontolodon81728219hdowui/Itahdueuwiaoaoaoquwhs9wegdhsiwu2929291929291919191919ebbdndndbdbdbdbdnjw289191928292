@@ -1,25 +1,14 @@
 -- ============================================================
--- Zeva v8.2.0 — patched build
+-- Zeva v8.2.2 — patched build
 -- ============================================================
--- [C] fixes + additions applied:
---   PointA/PointB on all Drawing Lines
---   pcall + type guards on setthreadidentity / getgc / hookfunction / debug.info
---   keybind Escape/Backspace unbind + double-click -> Auto
---   slider supports precision, round-half-up
---   getAvgAccel uses real dt
---   trackVel decoupled from cham throttle
---   freecam aborts cleanly if PlayerModule:GetControls fails
---   triggerbot sends touch events on mobile
---   raycast filter drops camera
---   keyName hardened against tostring errors
---   colorRow respects BUILD_PAGE
---   performSearch uses canvas-relative math + clamp
---   bh_valid gated on cfg.TeamCheck
---   mobile opB = v6.9.10 flat hamburger, always visible
---   Aimlock keybind + toggle-mode + double-click Auto (PC only)
---   Magic Bullet keybind + toggle-mode + double-click Auto (PC only)
---   hint label truncated, hidden on mobile, no search-bar collision
---   change device -> device picker (no passkey re-entry), session carried
+-- [C] fixes applied on top of v8.2.1:
+--   - button() rewritten to use TextButton.Text (fixes overlapping Save Config)
+--   - Save Config callback updated to use direct button ref
+--   - tab label shift reduced to +4px for tighter alignment
+--   - Added HideProfile to cfg
+--   - Added "Hide Profile" toggle in profilePanel (changes avatars to Roblox guest)
+--   - HideName -> (anonymous), HideInfo -> (anonymous)
+--   - Reset to Default now reapplies privacy states
 -- ============================================================
 
 -- ============================================================
@@ -48,10 +37,8 @@ do
                         x = a
                         pcall(function()
                             hookfunction(x, function(c, f, n)
-                                if c ~= "_" then
-                                    if d then warn(("AntiCheat flagged\nMethod: %s\nInfo: %s"):format(tostring(c), tostring(f))) end
-                                end
-                                return true
+                                if d then warn(("AntiCheat flagged (suppressed)\nMethod: %s\nInfo: %s"):format(tostring(c), tostring(f))) end
+                                return nil
                             end)
                         end)
                     end
@@ -77,7 +64,7 @@ do
                         local a, f = ...
                         if x and a == x then
                             if d then warn("zins | bypassed") end
-                            return coroutine.yield(coroutine.running())
+                            return ""
                         end
                         return o(...)
                     end))
@@ -90,7 +77,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.2.0
+-- Zeva v8.2.2
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -142,6 +129,7 @@ if not CAP.Drawing then
             UDim2.new(1,0,1,0), 1, Color3.new(1,1,1), Enum.Font.Code, 12, true
         t.Text = "[c] this executor has no Drawing library."
     end
+    warn("[c] this executor has no Drawing library — script aborted.")
     return
 end
 
@@ -171,11 +159,8 @@ end
 local function realAntiCheatScan()
     local findings = {}
     local patterns = {
-        "anticheat", "anti%-cheat", "ac_", "_ac", "battleye", "eac",
-        "vanguard", "hyperion", "byfron", "kernel", "inject",
-        "detect", "integrity", "validate", "verify", "suspicious",
-        "report", "ban", "kick", "punish", "sanction", "monitor",
-        "audit", "anomal", "secur", "guard", "shield", "sentinel",
+        "anticheat", "anti%-cheat", "battleye", "eac", "vanguard",
+        "hyperion", "byfron", "easy%-anticheat", "five%-protect",
     }
     local function matches(s)
         local low = s:lower()
@@ -347,12 +332,12 @@ local TERM = {
 local MONO = Enum.Font.Code
 
 local function termScanlines(parent, height)
-    for i = 1, math.ceil(height / 3) do
+    for i = 1, math.ceil(height / 4) do
         local ln = Instance.new("Frame", parent)
         ln.Size = UDim2.new(1, 0, 0, 1)
-        ln.Position = UDim2.new(0, 0, 0, i * 3 - 1)
+        ln.Position = UDim2.new(0, 0, 0, i * 4 - 1)
         ln.BackgroundColor3 = Color3.new(0, 0, 0)
-        ln.BackgroundTransparency = 0.9
+        ln.BackgroundTransparency = 0.85
         ln.BorderSizePixel = 0
         ln.ZIndex = 30
         ln.Active = false
@@ -478,7 +463,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.2.0", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.2.2", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -921,19 +906,22 @@ local SPECTATE_ATTRS = {
 local UI_KBD = Enum.UserInputType.Keyboard
 local UI_M2 = Enum.UserInputType.MouseButton2
 local UI_M3 = Enum.UserInputType.MouseButton3
-local BONE_PAIRS = {
-    {"Head","Torso"},{"Torso","Left Arm"},{"Torso","Right Arm"},{"Torso","Left Leg"},{"Torso","Right Leg"},
+local BONE_PAIRS_R6 = {
+    {"Head","Torso"},
+    {"Torso","Left Arm"},{"Torso","Right Arm"},
+    {"Torso","Left Leg"},{"Torso","Right Leg"},
+}
+local BONE_PAIRS_R15 = {
     {"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
     {"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
     {"UpperTorso","RightUpperArm"},{"RightUpperArm","RightLowerArm"},{"RightLowerArm","RightHand"},
     {"LowerTorso","LeftUpperLeg"},{"LeftUpperLeg","LeftLowerLeg"},{"LeftLowerLeg","LeftFoot"},
     {"LowerTorso","RightUpperLeg"},{"RightUpperLeg","RightLowerLeg"},{"RightLowerLeg","RightFoot"},
 }
-local BONE_PAIRS_COUNT = #BONE_PAIRS
+local BONE_PAIRS_COUNT = 19
 
 local function setLinePoints(l, a, b)
     if not l then return end
-    pcall(function() l.PointA = a; l.PointB = b end)
     pcall(function() l.From = a; l.To = b end)
 end
 
@@ -987,8 +975,25 @@ function StartScript(plf)
         FreeCam=false, FreeCamSpeed=60,
         BigHead=false, BigHeadSizeNum=20,
         BigHeadKey=nil, BigHeadToggleMode=false, BigHeadHeld=false, BigHeadToggled=false,
-        HideName=false, HideInfo=false,
+        HideName=false, HideInfo=false, HideProfile=false,
     }
+
+    local CFG_DEFAULTS = {}
+    for k, v in pairs(cfg) do
+        if type(v) == "number" or type(v) == "boolean" or type(v) == "string" then
+            CFG_DEFAULTS[k] = v
+        elseif typeof(v) == "Color3" then
+            CFG_DEFAULTS[k] = Color3.new(v.R, v.G, v.B)
+        elseif typeof(v) == "EnumItem" then
+            CFG_DEFAULTS[k] = v
+        elseif type(v) == "table" then
+            local cc = {}
+            for kk, vv in pairs(v) do cc[kk] = vv end
+            CFG_DEFAULTS[k] = cc
+        end
+    end
+    CFG_DEFAULTS.AimKey = "NIL_SENTINEL"
+    CFG_DEFAULTS.BigHeadKey = "NIL_SENTINEL"
 
     local FEATURE_INDEX = {}
     local BUILD_PAGE = "aim"
@@ -1042,6 +1047,8 @@ function StartScript(plf)
     local killStats = {hits = 0}
     local killFeed = {}
     local aaYawAccum = 0
+    local aaOriginalNeckC0 = nil
+    local lastFrameDt = 1/60
 
     -- MAGIC BULLET
     local bhCache = {}
@@ -1050,12 +1057,14 @@ function StartScript(plf)
     local function bh_isTarget(part) return part:IsA("BasePart") and BH_NAMES[part.Name] == true end
     local function bh_snapshot(part)
         if bhCache[part] then return end
-        bhCache[part] = {
+        local snap = {
             Size = part.Size, Transparency = part.Transparency,
             LocalTransparencyModifier = part.LocalTransparencyModifier,
             CanCollide = part.CanCollide, CanQuery = part.CanQuery,
             CanTouch = part.CanTouch, Massless = part.Massless, children = {},
         }
+        if part:IsA("Part") then snap.Shape = part.Shape end
+        bhCache[part] = snap
     end
     local function bh_hideChildren(part)
         local snap = bhCache[part]
@@ -1122,6 +1131,7 @@ function StartScript(plf)
     local function bh_restore(part)
         local s = bhCache[part]; if not s then return end
         if part.Parent then
+            if s.Shape and part:IsA("Part") then pcall(function() part.Shape = s.Shape end) end
             part.Size = s.Size; part.Transparency = s.Transparency
             part.LocalTransparencyModifier = s.LocalTransparencyModifier
             part.CanCollide = s.CanCollide; part.CanQuery = s.CanQuery
@@ -1269,7 +1279,10 @@ function StartScript(plf)
         local hrp = char:FindFirstChild("HumanoidRootPart"); if not hrp then return end
         local neck = char:FindFirstChild("Neck", true)
         if neck and neck:IsA("Motor6D") then
-            neck.C0 = CFrame.new(0,1,0) * CFrame.Angles(-math.pi/2 + math.rad(cfg.AntiAimPitch), math.pi, 0)
+            if not aaOriginalNeckC0 then aaOriginalNeckC0 = neck.C0 end
+            local isR15 = char:FindFirstChild("UpperTorso") ~= nil
+            local baseY = isR15 and -0.5 or 1.0
+            neck.C0 = CFrame.new(0, baseY, 0) * CFrame.Angles(-math.pi/2 + math.rad(cfg.AntiAimPitch), math.pi, 0)
         end
         local yaw
         if cfg.AntiAimMode == "Static" then yaw = cfg.AntiAimYaw
@@ -1290,10 +1303,11 @@ function StartScript(plf)
         local char = p.Character
         if char then
             local neck = char:FindFirstChild("Neck", true)
-            if neck and neck:IsA("Motor6D") then
-                neck.C0 = CFrame.new(0,1,0) * CFrame.Angles(-math.pi/2, math.pi, 0)
+            if neck and neck:IsA("Motor6D") and aaOriginalNeckC0 then
+                neck.C0 = aaOriginalNeckC0
             end
         end
+        aaOriginalNeckC0 = nil
     end
 
     local function inFovShape(dx, dy, r, shape)
@@ -1420,7 +1434,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.0", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.2.2", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -1474,7 +1488,7 @@ function StartScript(plf)
     local uAvatar = Instance.new("ImageLabel", userCard)
     uAvatar.Size, uAvatar.Position, uAvatar.BackgroundColor3, uAvatar.BorderSizePixel =
         UDim2.new(0,uAvatarSz,0,uAvatarSz), UDim2.new(0,10,0.5,-uAvatarSz/2), TH.Panel2, 0
-    uAvatar.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+    uAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
     uAvatar.ZIndex = 9
     round(uAvatar, 10); stroke(uAvatar, TH.Accent, 1.5, 0.3); regAccent(uAvatar.UIStroke, "Color")
 
@@ -1483,21 +1497,29 @@ function StartScript(plf)
 
     local uName = Instance.new("TextLabel", userCard)
     uName.Size, uName.Position, uName.BackgroundTransparency, uName.Text, uName.TextColor3, uName.Font, uName.TextSize =
-        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY), 1, p.DisplayName, TH.Text, FONTB, 12
+        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY), 1, cfg.HideName and "(anonymous)" or p.DisplayName, TH.Text, FONTB, 12
     uName.TextXAlignment = Enum.TextXAlignment.Left; uName.TextTruncate = Enum.TextTruncate.AtEnd
     uName.ZIndex = 9
 
     local uHandle = Instance.new("TextLabel", userCard)
     uHandle.Size, uHandle.Position, uHandle.BackgroundTransparency, uHandle.Text, uHandle.TextColor3, uHandle.Font, uHandle.TextSize =
-        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY + uRowGap), 1, "@"..p.Name, TH.TextDim, FONTL, 10
+        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY + uRowGap), 1, cfg.HideInfo and "(anonymous)" or ("@"..p.Name), TH.TextDim, FONTL, 10
     uHandle.TextXAlignment = Enum.TextXAlignment.Left; uHandle.TextTruncate = Enum.TextTruncate.AtEnd
     uHandle.ZIndex = 9
 
     local uId = Instance.new("TextLabel", userCard)
     uId.Size, uId.Position, uId.BackgroundTransparency, uId.Text, uId.TextColor3, uId.Font, uId.TextSize =
-        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY + uRowGap * 2), 1, "id "..tostring(p.UserId), TH.TextMute, FONTL, 9
+        UDim2.new(1,uTextW,0,uRowGap), UDim2.new(0,uTextX,0,uNameY + uRowGap * 2), 1, cfg.HideInfo and "(anonymous)" or ("id "..tostring(p.UserId)), TH.TextMute, FONTL, 9
     uId.TextXAlignment = Enum.TextXAlignment.Left
     uId.ZIndex = 9
+
+    local hoverOverlay = Instance.new("Frame", userCard)
+    hoverOverlay.Size = UDim2.new(1, 0, 1, 0)
+    hoverOverlay.BackgroundColor3 = TH.Accent
+    hoverOverlay.BackgroundTransparency = 1
+    hoverOverlay.BorderSizePixel = 0
+    hoverOverlay.ZIndex = 8
+    round(hoverOverlay, 12)
 
     local userCardBtn = Instance.new("TextButton", userCard)
     userCardBtn.Size = UDim2.new(1, 0, 1, 0)
@@ -1507,8 +1529,8 @@ function StartScript(plf)
     userCardBtn.AutoButtonColor = false
     userCardBtn.BorderSizePixel = 0
     userCardBtn.ZIndex = 11
-    userCardBtn.MouseEnter:Connect(function() tw(userCard, EASE.fast, {BackgroundColor3 = TH.Panel2}) end)
-    userCardBtn.MouseLeave:Connect(function() tw(userCard, EASE.fast, {BackgroundColor3 = TH.Panel}) end)
+    userCardBtn.MouseEnter:Connect(function() tw(hoverOverlay, EASE.fast, {BackgroundTransparency = 0.88}) end)
+    userCardBtn.MouseLeave:Connect(function() tw(hoverOverlay, EASE.fast, {BackgroundTransparency = 1}) end)
 
     local tabColTop = 16
     local tabColBottom = uCardH + 16 + 16
@@ -1620,7 +1642,7 @@ function StartScript(plf)
     profileBackdropBtn.ZIndex = 61
 
     local pw = isPC and 440 or 360
-    local ph = isPC and 440 or 400
+    local ph = isPC and 480 or 440
     local profilePanel = Instance.new("Frame", root)
     profilePanel.Size = UDim2.new(0, pw, 0, ph)
     profilePanel.Position = UDim2.new(0.5, -pw/2, 0.5, -ph/2 - 8)
@@ -1669,19 +1691,19 @@ function StartScript(plf)
     ppAvatar.Size, ppAvatar.Position = UDim2.new(0, 80, 0, 80), UDim2.new(0.5, -40, 0, 56)
     ppAvatar.BackgroundColor3 = TH.Panel2
     ppAvatar.BorderSizePixel = 0
-    ppAvatar.Image = "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=420&h=420"
+    ppAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=420&h=420"
     ppAvatar.ZIndex = 63
     round(ppAvatar, 40); stroke(ppAvatar, TH.Accent, 2, 0.2); regAccent(ppAvatar.UIStroke, "Color")
 
     local ppDisplayName = Instance.new("TextLabel", profilePanel)
     ppDisplayName.Size, ppDisplayName.Position, ppDisplayName.BackgroundTransparency, ppDisplayName.Text, ppDisplayName.TextColor3, ppDisplayName.Font, ppDisplayName.TextSize =
-        UDim2.new(1, -32, 0, 22), UDim2.new(0, 16, 0, 148), 1, p.DisplayName, TH.Text, FONTX, 16
+        UDim2.new(1, -32, 0, 22), UDim2.new(0, 16, 0, 148), 1, cfg.HideName and "(anonymous)" or p.DisplayName, TH.Text, FONTX, 16
     ppDisplayName.TextXAlignment = Enum.TextXAlignment.Center
     ppDisplayName.ZIndex = 63
 
     local ppHandle = Instance.new("TextLabel", profilePanel)
     ppHandle.Size, ppHandle.Position, ppHandle.BackgroundTransparency, ppHandle.Text, ppHandle.TextColor3, ppHandle.Font, ppHandle.TextSize =
-        UDim2.new(1, -32, 0, 16), UDim2.new(0, 16, 0, 172), 1, "@"..p.Name, TH.TextDim, FONTL, 11
+        UDim2.new(1, -32, 0, 16), UDim2.new(0, 16, 0, 172), 1, cfg.HideInfo and "(anonymous)" or ("@"..p.Name), TH.TextDim, FONTL, 11
     ppHandle.TextXAlignment = Enum.TextXAlignment.Center
     ppHandle.ZIndex = 63
 
@@ -1695,7 +1717,7 @@ function StartScript(plf)
 
     local ppIdLabel = Instance.new("TextLabel", ppIdRow)
     ppIdLabel.Size, ppIdLabel.Position, ppIdLabel.BackgroundTransparency, ppIdLabel.Text, ppIdLabel.TextColor3, ppIdLabel.Font, ppIdLabel.TextSize =
-        UDim2.new(1, -120, 1, 0), UDim2.new(0, 12, 0, 0), 1, "id   "..tostring(p.UserId), TH.Text, FONTL, 12
+        UDim2.new(1, -120, 1, 0), UDim2.new(0, 12, 0, 0), 1, cfg.HideInfo and "(anonymous)" or ("id   "..tostring(p.UserId)), TH.Text, FONTL, 12
     ppIdLabel.TextXAlignment = Enum.TextXAlignment.Left
     ppIdLabel.ZIndex = 64
 
@@ -1775,10 +1797,16 @@ function StartScript(plf)
             cfg[cfgKey] = not cfg[cfgKey]
             refresh()
             if cfgKey == "HideName" then
-                uName.TextTransparency = cfg.HideName and 1 or 0
+                uName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
+                ppDisplayName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
             elseif cfgKey == "HideInfo" then
-                uHandle.TextTransparency = cfg.HideInfo and 1 or 0
-                uId.TextTransparency = cfg.HideInfo and 1 or 0
+                uHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+                uId.Text = cfg.HideInfo and "(anonymous)" or ("id "..tostring(p.UserId))
+                ppHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+                ppIdLabel.Text = cfg.HideInfo and "(anonymous)" or ("id   "..tostring(p.UserId))
+            elseif cfgKey == "HideProfile" then
+                uAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+                ppAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=420&h=420"
             end
         end)
 
@@ -1787,22 +1815,23 @@ function StartScript(plf)
 
     mkPrivacyToggle("Hide Name", "HideName", 276)
     mkPrivacyToggle("Hide Info", "HideInfo", 312)
+    mkPrivacyToggle("Hide Profile", "HideProfile", 348)
 
     local ppDiv2 = Instance.new("Frame", profilePanel)
-    ppDiv2.Size, ppDiv2.Position = UDim2.new(1, -32, 0, 1), UDim2.new(0, 16, 0, 352)
+    ppDiv2.Size, ppDiv2.Position = UDim2.new(1, -32, 0, 1), UDim2.new(0, 16, 0, 388)
     ppDiv2.BackgroundColor3 = TH.LineSoft; ppDiv2.BorderSizePixel = 0
     ppDiv2.ZIndex = 63
 
     local ppSessLbl = Instance.new("TextLabel", profilePanel)
     ppSessLbl.Size, ppSessLbl.Position, ppSessLbl.BackgroundTransparency, ppSessLbl.Text, ppSessLbl.TextColor3, ppSessLbl.Font, ppSessLbl.TextSize =
-        UDim2.new(1, -32, 0, 16), UDim2.new(0, 16, 0, 362), 1, ":: session", TH.TextDim, FONTB, 10
+        UDim2.new(1, -32, 0, 16), UDim2.new(0, 16, 0, 398), 1, ":: session", TH.TextDim, FONTB, 10
     ppSessLbl.TextXAlignment = Enum.TextXAlignment.Left
     ppSessLbl.ZIndex = 63
 
     local ppSessionInfo = Instance.new("TextLabel", profilePanel)
     ppSessionInfo.Size, ppSessionInfo.Position, ppSessionInfo.BackgroundTransparency, ppSessionInfo.Text,
         ppSessionInfo.TextColor3, ppSessionInfo.Font, ppSessionInfo.TextSize =
-        UDim2.new(1, -32, 0, 40), UDim2.new(0, 16, 0, 384), 1,
+        UDim2.new(1, -32, 0, 40), UDim2.new(0, 16, 0, 420), 1,
         "key      " .. tostring(_G.__zeva_sessionKey or "unknown") .. "\nplatform " .. tostring(_G.__zeva_sessionPlatform or "unknown"),
         TH.Text, FONTL, 11
     ppSessionInfo.TextXAlignment = Enum.TextXAlignment.Left
@@ -1851,7 +1880,7 @@ function StartScript(plf)
             tw(data.bar, EASE.med, {
                 Size = on and UDim2.new(0, ICON_W, 0, tabH - 14) or UDim2.new(0, ICON_W, 0, 0)
             })
-            local targetX = on and (data.baseX + 8) or data.baseX
+            local targetX = on and (data.baseX + 4) or data.baseX
             tw(data.label, EASE.med, {Position = UDim2.new(0, targetX, 0.5, 0)})
         end
         if prev and pages[prev] then
@@ -2035,8 +2064,9 @@ function StartScript(plf)
         local state = cfg[cfgKey] ~= nil and cfg[cfgKey] or default or false
         local lbl = Instance.new("TextLabel", r)
         lbl.Size, lbl.BackgroundTransparency, lbl.Text, lbl.TextColor3, lbl.Font, lbl.TextSize =
-            UDim2.new(1,-60,1,0), 1, label, TH.Text, FONT, 12
+            UDim2.new(1,-90,1,0), 1, label, TH.Text, FONT, 12
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextTruncate = Enum.TextTruncate.AtEnd
         lbl.ZIndex = 8
 
         local track = Instance.new("Frame", r)
@@ -2086,7 +2116,16 @@ function StartScript(plf)
             state = not state; refresh(true)
             if cb then cb(state) end
         end)
-        regRefresh(cfgKey, function() state = cfg[cfgKey] and true or false; refresh(false) end)
+        regRefresh(cfgKey, function()
+            local newState = cfg[cfgKey] and true or false
+            if newState ~= state then
+                state = newState
+                refresh(false)
+                if cb then cb(state) end
+            else
+                refresh(false)
+            end
+        end)
         regFeature(label, BUILD_PAGE, r)
         return {set = function(v) state = v; refresh(false) end, get = function() return state end}
     end
@@ -2161,7 +2200,11 @@ function StartScript(plf)
                 tw(knob, EASE.backSm, {Size = UDim2.new(0, 14, 0, 14)})
             end
         end)
-        regRefresh(cfgKey, function() value = cfg[cfgKey]; redraw(false) end)
+        regRefresh(cfgKey, function()
+            value = cfg[cfgKey]
+            redraw(false)
+            if cb then cb(value) end
+        end)
         regFeature(label, BUILD_PAGE, r)
         return {set = function(v) value = v; redraw(true); cb(v) end, get = function() return value end}
     end
@@ -2202,24 +2245,19 @@ function StartScript(plf)
     local function button(parent, label, cb)
         local b = Instance.new("TextButton", parent)
         b.Size, b.BackgroundColor3, b.Text, b.TextColor3, b.Font, b.TextSize =
-            UDim2.new(1,0,0, ROW_H_TALL), TH.Panel2, "", TH.Text, FONTB, 11
+            UDim2.new(1,0,0, ROW_H_TALL), TH.Panel2, label, TH.Text, FONTB, 11
         b.AutoButtonColor, b.BorderSizePixel = false, 0
         b.ClipsDescendants = true
         b.ZIndex = 8
         round(b, 10); stroke(b, TH.LineHi, 1, 0.4)
 
-        local txt = Instance.new("TextLabel", b)
-        txt.Size, txt.Position, txt.BackgroundTransparency, txt.Text, txt.TextColor3, txt.Font, txt.TextSize =
-            UDim2.new(1,0,1,0), UDim2.new(0,0,0,0), 1, label, TH.Text, FONTB, 11
-        txt.ZIndex = b.ZIndex + 1
-
         b.MouseEnter:Connect(function()
             tw(b, EASE.fast, {BackgroundColor3=TH.Accent})
-            tw(txt, EASE.fast, {TextColor3=TH.Bg, Position = UDim2.new(0, 2, 0, 0)})
+            tw(b, EASE.fast, {TextColor3=TH.Bg})
         end)
         b.MouseLeave:Connect(function()
             tw(b, EASE.fast, {BackgroundColor3=TH.Panel2})
-            tw(txt, EASE.fast, {TextColor3=TH.Text, Position = UDim2.new(0, 0, 0, 0)})
+            tw(b, EASE.fast, {TextColor3=TH.Text})
         end)
         b.MouseButton1Down:Connect(function()
             tw(b, EASE.punch, {Size = UDim2.new(1, 0, 0, ROW_H_TALL - 2)})
@@ -2234,7 +2272,7 @@ function StartScript(plf)
                 pos = Vector2.new(mp.X - b.AbsolutePosition.X, mp.Y - b.AbsolutePosition.Y)
             end)
             ripple(b, pos.X, pos.Y)
-            if cb then cb() end
+            if cb then cb(b) end
         end)
         regFeature(label, BUILD_PAGE, b)
         return b
@@ -2321,9 +2359,7 @@ function StartScript(plf)
                     elseif isL then key = UIT_M1
                     elseif isR then key = UI_M2
                     else key = UI_M3 end
-                    if key == Enum.KeyCode.Escape then
-                        setKey(nil); b.Text = displayFor(nil)
-                    elseif key == Enum.KeyCode.Backspace then
+                    if key == Enum.KeyCode.Escape or key == Enum.KeyCode.Backspace then
                         setKey(nil); b.Text = displayFor(nil)
                     else
                         setKey(key); b.Text = displayFor(key)
@@ -2349,12 +2385,13 @@ function StartScript(plf)
         local r = row(parent, ROW_H)
         local lbl = Instance.new("TextLabel", r)
         lbl.Size, lbl.BackgroundTransparency, lbl.Text, lbl.TextColor3, lbl.Font, lbl.TextSize =
-            UDim2.new(1,-40,1,0), 1, label, TH.Text, FONT, 12
+            UDim2.new(1,-56,1,0), 1, label, TH.Text, FONT, 12
         lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextTruncate = Enum.TextTruncate.AtEnd
         lbl.ZIndex = 8
         local sw = Instance.new("TextButton", r)
         sw.Size, sw.Position, sw.BackgroundColor3, sw.Text, sw.AutoButtonColor, sw.BorderSizePixel =
-            UDim2.new(0,32,0,22), UDim2.new(1,-32,0.5,-11), cfg[cfgKey], "", false, 0
+            UDim2.new(0,32,0,22), UDim2.new(1,0,0.5,0), cfg[cfgKey], "", false, 0
         sw.AnchorPoint = Vector2.new(1, 0.5)
         sw.ZIndex = 8
         round(sw, 8); stroke(sw, TH.LineHi, 1, 0.4)
@@ -2618,7 +2655,7 @@ function StartScript(plf)
         toggle(s2, "Team Check", "TeamCheck", false, function(v) cfg.TeamCheck = v end)
         toggle(s2, "Show FOV", "ShowFov", false, function(v) cfg.ShowFov = v end)
         local s3 = section(pages["esp"], "customization")
-        toggle(s3, "Filled Box", "ESPFilled", false)
+        toggle(s3, "Filled Box", "ESPFilled", false, function(v) cfg.ESPFilled = v end)
         colorRow(s3, "Box Color", "BoxColor"); colorRow(s3, "Bone Color", "BoneColor")
         colorRow(s3, "Health Color", "HealthColor"); colorRow(s3, "Distance Color", "DistanceColor")
         colorRow(s3, "Tracer Color", "TracerColor"); colorRow(s3, "LookTracer Color", "LookTracerColor")
@@ -2712,8 +2749,10 @@ function StartScript(plf)
             b.ZIndex = 8
             round(b, circ and sz.X.Offset/2 or 8); stroke(b, TH.LineHi, 1, 0.4)
             local lb = Instance.new("TextLabel", b)
-            lb.Size, lb.BackgroundTransparency, lb.Text, lb.TextColor3, lb.Font, lb.TextSize =
-                UDim2.new(1,0,1,0), 1, name, cfg.SelectedParts[name] and TH.Bg or TH.Text, FONTB, fs or 10
+            lb.Size, lb.BackgroundTransparency, lb.Text, lb.TextColor3, lb.Font =
+                UDim2.new(1,-4,1,0), 1, name, cfg.SelectedParts[name] and TH.Bg or TH.Text, FONTB
+            lb.TextScaled = true
+            lb.TextWrapped = true
             lb.ZIndex = 9
             local function refresh(animated)
                 local on = cfg.SelectedParts[name]
@@ -2818,9 +2857,17 @@ function StartScript(plf)
             if fC and cfg.FovSize and cfg.FovShape == "Circle" then pcall(function() fC.Radius = cfg.FovSize end) end
             if plf == "PC" then setHintKey(cfg.HideKey) end
             markSelectedPartsDirty()
+            uName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
+            uHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+            uId.Text = cfg.HideInfo and "(anonymous)" or ("id "..tostring(p.UserId))
+            uAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+            ppAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=420&h=420"
+            ppDisplayName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
+            ppHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+            ppIdLabel.Text = cfg.HideInfo and "(anonymous)" or ("id   "..tostring(p.UserId))
             refreshAllFromCfg()
         end
-        button(s, "Save Config", function()
+        button(s, "Save Config", function(btn)
             local data = {}
             for k, v in pairs(cfg) do
                 local t = type(v)
@@ -2832,7 +2879,6 @@ function StartScript(plf)
             data.TargetList = {}; for k,v in pairs(cfg.TargetList) do data.TargetList[k] = v end
             data.PartColors = nil
             local ok = pcall(function() writefile("zeva_config.json", HS:JSONEncode(data)) end)
-            local btn = s:FindFirstChildOfClass("TextButton")
             if btn then
                 btn.Text = ok and "saved." or "save failed."
                 task.delay(1.5, function() if btn and btn.Parent then btn.Text = "Save Config" end end)
@@ -2842,28 +2888,35 @@ function StartScript(plf)
             pcall(function() local raw = readfile("zeva_config.json"); applyConfigData(HS:JSONDecode(raw)) end)
         end)
         button(s, "Reset to Default", function()
-            cfg.Trig=false; cfg.Aim=false; cfg.WallCheck=false; cfg.Chams=false
-            cfg.Bone=false; cfg.Box=false; cfg.Health=false; cfg.Dist=false
-            cfg.TeamCheck=false; cfg.KOCheck=true; cfg.AutoPred=true; cfg.JitterAim=true
-            cfg.Spin=false; cfg.Noclip=false; cfg.Tracer=false; cfg.LookTracer=false
-            cfg.ShowFov=false; cfg.TargetAll=false
-            cfg.HideKey = Enum.KeyCode.LeftBracket; cfg.AimKey = nil
-            cfg.AimKeyHeld=false; cfg.AimKeyToggled=false; cfg.AimToggleMode=false
-            cfg.MenuSound=true; cfg.AccentColor = Color3.fromRGB(150,130,255)
-            cfg.SelectedParts = {["Head"]=true}
-            cfg.TargetList = {}
-            cfg.BigHead=false; cfg.BigHeadSizeNum=20
-            cfg.BigHeadKey=nil; cfg.BigHeadToggleMode=false; cfg.BigHeadHeld=false; cfg.BigHeadToggled=false
-            cfg.AutoBhop=false
-            cfg.Smth=0.35; cfg.Pred=0.12; cfg.PredScale=1.0
-            cfg.FovShape="Circle"; cfg.AimPriority="Crosshair"; cfg.SmoothCurve="Linear"
-            cfg.HideName=false; cfg.HideInfo=false
-            uName.TextTransparency = 0
-            uHandle.TextTransparency = 0
-            uId.TextTransparency = 0
-            BH_restoreAll()
+            for k, v in pairs(CFG_DEFAULTS) do
+                if v == "NIL_SENTINEL" then
+                    cfg[k] = nil
+                elseif type(v) == "table" then
+                    local copy = {}
+                    for kk, vv in pairs(v) do copy[kk] = vv end
+                    cfg[k] = copy
+                elseif typeof(v) == "Color3" then
+                    cfg[k] = Color3.new(v.R, v.G, v.B)
+                else
+                    cfg[k] = v
+                end
+            end
+            cfg.AimKeyHeld = false; cfg.AimKeyToggled = false
+            cfg.BigHeadHeld = false; cfg.BigHeadToggled = false
+            if restoreAntiAim then restoreAntiAim() end
+            if BH_restoreAll then BH_restoreAll() end
+            if restoreFPSBooster then restoreFPSBooster() end
+            if fcStop then fcStop() end
             applyAccent(cfg.AccentColor)
             if plf == "PC" then setHintKey(cfg.HideKey) end
+            uName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
+            uHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+            uId.Text = cfg.HideInfo and "(anonymous)" or ("id "..tostring(p.UserId))
+            uAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=150&h=150"
+            ppAvatar.Image = cfg.HideProfile and "rbxthumb://type=AvatarHeadShot&id=1&w=150&h=150" or "rbxthumb://type=AvatarHeadShot&id="..p.UserId.."&w=420&h=420"
+            ppDisplayName.Text = cfg.HideName and "(anonymous)" or p.DisplayName
+            ppHandle.Text = cfg.HideInfo and "(anonymous)" or ("@"..p.Name)
+            ppIdLabel.Text = cfg.HideInfo and "(anonymous)" or ("id   "..tostring(p.UserId))
             markSelectedPartsDirty()
             refreshAllFromCfg()
         end)
@@ -3297,14 +3350,12 @@ function StartScript(plf)
     end
 
     local velHist = {}
-    local velTimestamps = {}
     local function trackVel(pl, dt)
         local ch = pl.Character; if not ch then return end
         local hrp = ch:FindFirstChild("HumanoidRootPart"); if not hrp then return end
         local v3 = hrp.AssemblyLinearVelocity
         local h = velHist[pl]
         if not h then velHist[pl] = {v3,v3,v3} else h[1],h[2],h[3] = h[2],h[3],v3 end
-        velTimestamps[pl] = (velTimestamps[pl] or 0) + (dt or 0.1)
     end
     local function getAvgVel(pl) local h = velHist[pl]; if not h then return V3_ZERO end; return (h[1]+h[2]+h[3]) / 3 end
     local function getAvgAccel(pl, dt) local h = velHist[pl]; if not h or not dt or dt <= 0 then return V3_ZERO end; return (h[3] - h[1]) / (2 * dt) end
@@ -3352,9 +3403,13 @@ function StartScript(plf)
         end
     end)
     task.spawn(function()
+        local cachedSv
         while g and g.Parent do
             task.wait(0.25)
-            local svStatus = g:FindFirstChild("svStatus", true)
+            if not cachedSv or not cachedSv.Parent then
+                cachedSv = g:FindFirstChild("svStatus", true)
+            end
+            local svStatus = cachedSv
             if svStatus then
                 if cfg.Aim and cfg.SpectateDetect then
                     if spectator.watching then
@@ -3373,14 +3428,15 @@ function StartScript(plf)
         if aimViewer then
             local svStatus = Instance.new("TextLabel", aimViewer)
             svStatus.Name = "svStatus"
-            svStatus.Size, svStatus.BackgroundTransparency = UDim2.new(1,-32,0,22), 1
-            svStatus.Position = UDim2.new(0, PAD_X, 0, 0)
+            svStatus.Size = UDim2.new(1, -32, 0, 22)
+            svStatus.BackgroundTransparency = 1
             svStatus.Text = "status: idle"
             svStatus.TextColor3 = TH.TextMute
             svStatus.Font = FONTL
             svStatus.TextSize = 11
             svStatus.TextXAlignment = Enum.TextXAlignment.Left
             svStatus.ZIndex = 8
+            svStatus.LayoutOrder = 99
         end
     end
 
@@ -3430,7 +3486,10 @@ function StartScript(plf)
             local it = Stats.Network.ServerStatsItem["Data Ping"]
             if it then pingSec = it:GetValue() * 0.001 end
         end)
-        local accel = getAvgAccel(pl, 0.1)
+        local accel = getAvgAccel(pl, lastFrameDt)
+        if accel.Magnitude > 500 then
+            accel = accel.Unit * 500
+        end
         local dist = (pos - c.CFrame.Position).Magnitude
         local leadTime = cfg.Pred * cfg.PredScale + pingSec * 0.5 + math.min(dist / 2000, 0.15)
         return pos + vel * leadTime + 0.5 * accel * leadTime * leadTime
@@ -3587,6 +3646,11 @@ function StartScript(plf)
         local camPos = camCF.Position
         local menuOpen = root.Visible
 
+        lastFrameDt = dt
+        for pl in pairs(cachedPlayers) do
+            if pl ~= p then trackVel(pl, dt) end
+        end
+
         local cAim, cBox, cBone, cHealth, cDist = cfg.Aim, cfg.Box, cfg.Bone, cfg.Health, cfg.Dist
         local cTracer, cLookTr = cfg.Tracer, cfg.LookTracer
         local cChams, cShowFov = cfg.Chams, cfg.ShowFov
@@ -3671,12 +3735,10 @@ function StartScript(plf)
 
         chamsAccum = chamsAccum + dt
         if chamsAccum >= 0.1 then
-            local velDt = chamsAccum
             chamsAccum = 0
             local cKillFeed = cfg.KillFeed
             for pl in pairs(cachedPlayers) do
                 if pl ~= p then
-                    trackVel(pl, velDt)
                     local ch = pl.Character
                     if ch then
                         local hum = ch:FindFirstChild("Humanoid")
@@ -3764,9 +3826,11 @@ function StartScript(plf)
                             elseif d.LT.Visible then d.LT.Visible = false end
                         end
                         if cBone then
+                            local bp = ch:FindFirstChild("UpperTorso") and BONE_PAIRS_R15 or BONE_PAIRS_R6
+                            local bpCount = #bp
                             local li = 1
-                            for k = 1, BONE_PAIRS_COUNT do
-                                local pr = BONE_PAIRS[k]
+                            for k = 1, bpCount do
+                                local pr = bp[k]
                                 local p1, p2 = ch:FindFirstChild(pr[1]), ch:FindFirstChild(pr[2])
                                 if p1 and p2 then
                                     local v1, o1 = c:WorldToViewportPoint(p1.Position)
@@ -4080,11 +4144,10 @@ function StartScript(plf)
         end
         local hc = hitChams[pl]
         if hc then pcall(function() hc.sq:Remove() end); hitChams[pl] = nil end
-        lastHealth[pl] = nil; velHist[pl] = nil; velTimestamps[pl] = nil; validityCache[pl] = nil
+        lastHealth[pl] = nil; velHist[pl] = nil; validityCache[pl] = nil
         local ch = pl.Character
         if ch then koCache[ch] = nil; bh_restoreCharacter(ch) end
     end))
 end
 
 buildSelector()
-

@@ -6,6 +6,7 @@
 --   - Removed FPS Booster feature
 --   - Moved Free Cam to MOVE tab
 --   - Moved FPS/Ping Overlay to SETTINGS tab
+--   - Danger Zone swapped to premium card-style buttons
 -- ============================================================
 
 -- ============================================================
@@ -2997,25 +2998,104 @@ function StartScript(plf)
         toggle(s6, "Kill Feed", "KillFeed", false, function(v) cfg.KillFeed = v end)
         toggle(s6, "FPS / Ping Overlay", "FPSOverlay", false, function(v) cfg.FPSOverlay = v end)
 
+        -- DANGER ZONE (premium card-style)
         local s8 = section(pages["settings"], "danger zone")
-        local cd = Instance.new("TextButton", s8)
-        cd.Size, cd.BackgroundColor3, cd.BackgroundTransparency, cd.Text, cd.TextColor3, cd.Font, cd.TextSize =
-            UDim2.new(1,0,0,36), TH.Accent, 0.15, "change device", Color3.fromRGB(9,10,12), FONTB, 12
-        cd.AutoButtonColor, cd.BorderSizePixel = false, 0
-        cd.ClipsDescendants = true
-        cd.ZIndex = 8
-        round(cd, 10); stroke(cd, TH.Accent, 1, 0.2)
-        cd.MouseEnter:Connect(function() tw(cd, EASE.fast, {BackgroundTransparency = 0}) end)
-        cd.MouseLeave:Connect(function() tw(cd, EASE.fast, {BackgroundTransparency = 0.15}) end)
-        local db = Instance.new("TextButton", s8)
-        db.Size, db.BackgroundColor3, db.BackgroundTransparency, db.Text, db.TextColor3, db.Font, db.TextSize =
-            UDim2.new(1,0,0,36), TH.Danger, 0.15, "destroy gui", Color3.fromRGB(255,255,255), FONTB, 12
-        db.AutoButtonColor, db.BorderSizePixel = false, 0
-        db.ClipsDescendants = true
-        db.ZIndex = 8
-        round(db, 10); stroke(db, TH.Danger, 1, 0.2)
-        db.MouseEnter:Connect(function() tw(db, EASE.fast, {BackgroundTransparency = 0}) end)
-        db.MouseLeave:Connect(function() tw(db, EASE.fast, {BackgroundTransparency = 0.15}) end)
+
+        local dz1 = Instance.new("TextButton", s8)
+        dz1.Size = UDim2.new(1, 0, 0, 44)
+        dz1.BackgroundColor3 = TH.Panel2
+        dz1.BorderSizePixel = 0
+        dz1.AutoButtonColor = false
+        dz1.ClipsDescendants = true
+        dz1.ZIndex = 8
+        round(dz1, 10)
+        local dz1Stroke = stroke(dz1, TH.LineHi, 1, 0.5)
+
+        local dz1Accent = Instance.new("Frame", dz1)
+        dz1Accent.Size = UDim2.new(0, 3, 0.6, 0)
+        dz1Accent.Position = UDim2.new(0, 0, 0.2, 0)
+        dz1Accent.BackgroundColor3 = TH.Accent
+        dz1Accent.BorderSizePixel = 0
+        round(dz1Accent, 2)
+
+        local dz1Title = Instance.new("TextLabel", dz1)
+        dz1Title.Size = UDim2.new(1, -20, 0, 20)
+        dz1Title.Position = UDim2.new(0, 16, 0, 4)
+        dz1Title.BackgroundTransparency = 1
+        dz1Title.Text = "Change Device"
+        dz1Title.TextColor3 = TH.Text
+        dz1Title.Font = FONTB
+        dz1Title.TextSize = 12
+        dz1Title.TextXAlignment = Enum.TextXAlignment.Left
+        dz1Title.ZIndex = 9
+
+        local dz1Sub = Instance.new("TextLabel", dz1)
+        dz1Sub.Size = UDim2.new(1, -20, 0, 14)
+        dz1Sub.Position = UDim2.new(0, 16, 0, 22)
+        dz1Sub.BackgroundTransparency = 1
+        dz1Sub.Text = "Switch between PC and Mobile view"
+        dz1Sub.TextColor3 = TH.TextDim
+        dz1Sub.Font = FONT
+        dz1Sub.TextSize = 10
+        dz1Sub.TextXAlignment = Enum.TextXAlignment.Left
+        dz1Sub.ZIndex = 9
+
+        dz1.MouseEnter:Connect(function()
+            tw(dz1, EASE.fast, {BackgroundColor3 = TH.Panel3})
+            tw(dz1Stroke, EASE.fast, {Color = TH.Accent, Transparency = 0.2})
+        end)
+        dz1.MouseLeave:Connect(function()
+            tw(dz1, EASE.fast, {BackgroundColor3 = TH.Panel2})
+            tw(dz1Stroke, EASE.fast, {Color = TH.LineHi, Transparency = 0.5})
+        end)
+
+        local dz2 = Instance.new("TextButton", s8)
+        dz2.Size = UDim2.new(1, 0, 0, 44)
+        dz2.BackgroundColor3 = TH.Panel2
+        dz2.BorderSizePixel = 0
+        dz2.AutoButtonColor = false
+        dz2.ClipsDescendants = true
+        dz2.ZIndex = 8
+        round(dz2, 10)
+        local dz2Stroke = stroke(dz2, TH.LineHi, 1, 0.5)
+
+        local dz2Accent = Instance.new("Frame", dz2)
+        dz2Accent.Size = UDim2.new(0, 3, 0.6, 0)
+        dz2Accent.Position = UDim2.new(0, 0, 0.2, 0)
+        dz2Accent.BackgroundColor3 = TH.Danger
+        dz2Accent.BorderSizePixel = 0
+        round(dz2Accent, 2)
+
+        local dz2Title = Instance.new("TextLabel", dz2)
+        dz2Title.Size = UDim2.new(1, -20, 0, 20)
+        dz2Title.Position = UDim2.new(0, 16, 0, 4)
+        dz2Title.BackgroundTransparency = 1
+        dz2Title.Text = "Destroy GUI"
+        dz2Title.TextColor3 = TH.Danger
+        dz2Title.Font = FONTB
+        dz2Title.TextSize = 12
+        dz2Title.TextXAlignment = Enum.TextXAlignment.Left
+        dz2Title.ZIndex = 9
+
+        local dz2Sub = Instance.new("TextLabel", dz2)
+        dz2Sub.Size = UDim2.new(1, -20, 0, 14)
+        dz2Sub.Position = UDim2.new(0, 16, 0, 22)
+        dz2Sub.BackgroundTransparency = 1
+        dz2Sub.Text = "Completely unload the script"
+        dz2Sub.TextColor3 = TH.TextDim
+        dz2Sub.Font = FONT
+        dz2Sub.TextSize = 10
+        dz2Sub.TextXAlignment = Enum.TextXAlignment.Left
+        dz2Sub.ZIndex = 9
+
+        dz2.MouseEnter:Connect(function()
+            tw(dz2, EASE.fast, {BackgroundColor3 = TH.Panel3})
+            tw(dz2Stroke, EASE.fast, {Color = TH.Danger, Transparency = 0.2})
+        end)
+        dz2.MouseLeave:Connect(function()
+            tw(dz2, EASE.fast, {BackgroundColor3 = TH.Panel2})
+            tw(dz2Stroke, EASE.fast, {Color = TH.LineHi, Transparency = 0.5})
+        end)
 
         local function teardown()
             if mainLoop then pcall(function() mainLoop:Disconnect() end); mainLoop = nil end
@@ -3035,14 +3115,14 @@ function StartScript(plf)
             cfg.PartColors = {}
         end
 
-        db.MouseButton1Click:Connect(function()
+        dz2.MouseButton1Click:Connect(function()
             tw(root, EASE.pageOut, {BackgroundTransparency = 1})
             local rs = root:FindFirstChildOfClass("UIStroke")
             if rs then tw(rs, EASE.pageOut, {Transparency = 1}) end
             pcall(function() tw(glowStroke, EASE.pageOut, {Transparency = 1}) end)
             task.delay(0.14, teardown)
         end)
-        cd.MouseButton1Click:Connect(function()
+        dz1.MouseButton1Click:Connect(function()
             tw(root, EASE.pageOut, {BackgroundTransparency = 1})
             local rs = root:FindFirstChildOfClass("UIStroke")
             if rs then tw(rs, EASE.pageOut, {Transparency = 1}) end

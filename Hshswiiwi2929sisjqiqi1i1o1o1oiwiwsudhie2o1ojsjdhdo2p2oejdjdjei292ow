@@ -221,6 +221,9 @@ local function setVibe(on)
     end
 end
 
+-- FIX #1: currentPlatform declared BEFORE toast() so it captures the local
+local currentPlatform = "PC"
+
 _G.__zeva_notifEnabled = true
 local toastHolder
 local function toast(title, msg, color)
@@ -240,7 +243,7 @@ local function toast(title, msg, color)
 
     if not toastHolder or not toastHolder.Parent then
         local sg = Instance.new("ScreenGui")
-        sg.Name = "zeva_toast_" .. math.random(1e6, 9e6)
+        sg.Name = "zeva_toast_" .. math.random(1000000, 9000000)
         sg.ResetOnSpawn = false
         sg.IgnoreGuiInset = true
         sg.DisplayOrder = 200
@@ -449,7 +452,6 @@ local function clearSelectors()
         end
     end
 end
-local currentPlatform = "PC"
 
 local TERM = {
     Bg = Color3.fromRGB(4, 5, 6), Bar = Color3.fromRGB(18, 14, 9),
@@ -562,7 +564,7 @@ end
 function buildSelector()
     clearSelectors()
     local chG = Instance.new("ScreenGui", p.PlayerGui)
-    chG.Name = "zeva_sel_" .. tostring(math.random(1e6, 9e6))
+    chG.Name = "zeva_sel_" .. tostring(math.random(1000000, 9000000))
     chG.ResetOnSpawn = false; chG.IgnoreGuiInset = true; chG.DisplayOrder = 100
 
     local outer, body, s = termWindow(chG, "/dev/zeva --boot", 440, 260)
@@ -636,7 +638,7 @@ end
 function buildKeyScreen()
     clearSelectors()
     local kG = Instance.new("ScreenGui", p.PlayerGui)
-    kG.Name = "zeva_key_" .. tostring(math.random(1e6, 9e6))
+    kG.Name = "zeva_key_" .. tostring(math.random(1000000, 9000000))
     kG.ResetOnSpawn = false; kG.IgnoreGuiInset = true; kG.DisplayOrder = 100
 
     local outer, body, s = termWindow(kG, "/dev/zeva --auth", 440, 240)
@@ -765,7 +767,7 @@ end
 
 function buildScanScreen(onDone)
     local sG = Instance.new("ScreenGui", p.PlayerGui)
-    sG.Name = "zeva_scan_" .. tostring(math.random(1e6, 9e6))
+    sG.Name = "zeva_scan_" .. tostring(math.random(1000000, 9000000))
     sG.ResetOnSpawn = false
     sG.IgnoreGuiInset = true
     sG.DisplayOrder = 2147483647
@@ -952,7 +954,7 @@ end
 function buildDevicePicker()
     clearSelectors()
     local chG = Instance.new("ScreenGui", p.PlayerGui)
-    chG.Name = "zeva_sel_" .. tostring(math.random(1e6, 9e6))
+    chG.Name = "zeva_sel_" .. tostring(math.random(1000000, 9000000))
     chG.ResetOnSpawn = false; chG.IgnoreGuiInset = true; chG.DisplayOrder = 100
 
     local outer, body, s = termWindow(chG, "/dev/zeva --switch", 440, 200)
@@ -1281,7 +1283,7 @@ function StartScript(plf)
     local function bh_restore(part)
         local s = bhCache[part]; if not s then return end
         if part.Parent then
-            if s.Shape and part:IsA("Part") then pcall(function() part.Shape = s.Shape end) end
+            if s.Shape and part:IsA("Part") and s.Shape ~= part.Shape then pcall(function() part.Shape = s.Shape end) end
             part.Size = s.Size; part.Transparency = s.Transparency
             part.LocalTransparencyModifier = s.LocalTransparencyModifier
             part.CanCollide = s.CanCollide; part.CanQuery = s.CanQuery
@@ -1294,7 +1296,8 @@ function StartScript(plf)
         for i = #set, 1, -1 do bh_restore(set[i]) end
         bhCharSet[char] = nil
     end
-    function BH_restoreAll() for char in pairs(bhCharSet) do bh_restoreCharacter(char) end end
+    -- FIX #16: BH_restoreAll is now a local, not a global
+    local function BH_restoreAll() for char in pairs(bhCharSet) do bh_restoreCharacter(char) end end
     local lastJumpFire = 0
 
     local fcCFrame, fcControlsDisabled
@@ -1462,7 +1465,7 @@ function StartScript(plf)
     local ROW_INSET = 12
 
     local g = Instance.new("ScreenGui", p.PlayerGui)
-    g.Name = "zeva_" .. tostring(math.random(1e6, 9e6))
+    g.Name = "zeva_" .. tostring(math.random(1000000, 9000000))
     g.ResetOnSpawn = false; g.IgnoreGuiInset = true
     g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; g.DisplayOrder = 50
 
@@ -2168,7 +2171,10 @@ function StartScript(plf)
 
     local function toggle(parent, label, cfgKey, default, cb)
         local r = row(parent, ROW_H)
-        local state = cfg[cfgKey] ~= nil and cfg[cfgKey] or default or false
+        -- FIX #13: respect explicit false in cfg (was falling through to default)
+        local state = cfg[cfgKey]
+        if state == nil then state = default or false end
+
         local lbl = Instance.new("TextLabel", r)
         lbl.Size, lbl.BackgroundTransparency, lbl.Text, lbl.TextColor3, lbl.Font, lbl.TextSize =
             UDim2.new(1,-90,1,0), 1, label, TH.Text, FONT, 12
@@ -2449,6 +2455,8 @@ function StartScript(plf)
                 end)
             end
             task.wait(0.15)
+            -- FIX #12: guard state after the wait in case the user double-clicked
+            if not listening then return end
             local conn
             conn = U.InputBegan:Connect(function(input, gpe)
                 if gpe then return end
@@ -2796,7 +2804,7 @@ function StartScript(plf)
         local d = Instance.new("Frame", s)
         d.Size, d.BackgroundTransparency = UDim2.new(1,0,0,340), 1
         d.ZIndex = 7
-        local function partBtn(name, pos, sz, circ, fs)
+        local function partBtn(name, pos, sz, circ)
             local b = Instance.new("TextButton", d)
             b.Size, b.Position = sz, pos
             b.BackgroundColor3 = cfg.SelectedParts[name] and TH.On or TH.Panel2
@@ -2831,12 +2839,12 @@ function StartScript(plf)
             regRefresh("SelectedParts", refresh)
             regFeature(name, BUILD_PAGE, b)
         end
-        partBtn("Head", UDim2.new(0.5,-32,0,0), UDim2.new(0,64,0,64), true, 11)
-        partBtn("Torso", UDim2.new(0.5,-38,0,72), UDim2.new(0,76,0,120), false, 11)
-        partBtn("Left Arm", UDim2.new(0.5,-84,0,72), UDim2.new(0,42,0,120), false, 10)
-        partBtn("Right Arm", UDim2.new(0.5,42,0,72), UDim2.new(0,42,0,120), false, 10)
-        partBtn("Left Leg", UDim2.new(0.5,-38,0,200), UDim2.new(0,36,0,128), false, 10)
-        partBtn("Right Leg", UDim2.new(0.5,2,0,200), UDim2.new(0,36,0,128), false, 10)
+        partBtn("Head", UDim2.new(0.5,-32,0,0), UDim2.new(0,64,0,64), true)
+        partBtn("Torso", UDim2.new(0.5,-38,0,72), UDim2.new(0,76,0,120), false)
+        partBtn("Left Arm", UDim2.new(0.5,-84,0,72), UDim2.new(0,42,0,120), false)
+        partBtn("Right Arm", UDim2.new(0.5,42,0,72), UDim2.new(0,42,0,120), false)
+        partBtn("Left Leg", UDim2.new(0.5,-38,0,200), UDim2.new(0,36,0,128), false)
+        partBtn("Right Leg", UDim2.new(0.5,2,0,200), UDim2.new(0,36,0,128), false)
         local nr = Instance.new("Frame", s); nr.Size, nr.BackgroundTransparency = UDim2.new(1,0,0,28), 1
         nr.ZIndex = 7
         local nb = Instance.new("TextButton", nr)
@@ -3148,6 +3156,24 @@ function StartScript(plf)
             pcall(restoreAntiAim); pcall(fcStop); pcall(BH_restoreAll)
             pcall(function() RS:UnbindFromRenderStep(bindName) end)
             disconnectAll()
+            -- FIX #2: clean all ESP Drawing objects per player
+            for _, d in pairs(dr) do
+                pcall(function() if d.B then d.B:Remove() end end)
+                pcall(function() if d.BF then d.BF:Remove() end end)
+                pcall(function() if d.Name then d.Name:Remove() end end)
+                pcall(function() if d.HB then d.HB:Remove() end end)
+                pcall(function() if d.HM then d.HM:Remove() end end)
+                pcall(function() if d.HPText then d.HPText:Remove() end end)
+                pcall(function() if d.D then d.D:Remove() end end)
+                pcall(function() if d.T then d.T:Remove() end end)
+                pcall(function() if d.LT then d.LT:Remove() end end)
+                for _, l in pairs(d.L) do pcall(function() if l then l:Remove() end end) end
+                for _, l in pairs(d.C_Lines) do pcall(function() if l then l:Remove() end end) end
+            end
+            dr = {}
+            -- FIX #3: destroy the Sounds too
+            if hitSound then pcall(function() hitSound:Destroy() end); hitSound = nil end
+            if menuSound then pcall(function() menuSound:Destroy() end); menuSound = nil end
             pcall(function() if glowStroke then glowStroke:Destroy() end end)
             pcall(function() if glow then glow:Destroy() end end)
             pcall(function() fC:Remove() end); pcall(function() fS:Remove() end); pcall(function() fT:Remove() end)
@@ -3158,6 +3184,8 @@ function StartScript(plf)
             if _G.__zeva_radarGui then pcall(function() _G.__zeva_radarGui.sg:Destroy() end); _G.__zeva_radarGui = nil end
             if _G.__zeva_fpsGui then pcall(function() _G.__zeva_fpsGui.sg:Destroy() end); _G.__zeva_fpsGui = nil end
             if toastHolder and toastHolder.Parent then pcall(function() toastHolder.Parent:Destroy() end) end
+            -- FIX #20: clear config applier so it doesn't reference a dead GUI
+            _G.__zeva_applyConfigData = nil
             pcall(function() g:Destroy() end)
             pcall(function() blur:Destroy() end)
             pcall(function() bloom:Destroy() end)
@@ -3499,24 +3527,7 @@ function StartScript(plf)
             else spectator.watching, spectator.who = false, nil end
         end
     end)
-    task.spawn(function()
-        local cachedSv
-        while g and g.Parent do
-            task.wait(0.25)
-            if not cachedSv or not cachedSv.Parent then
-                cachedSv = g:FindFirstChild("svStatus", true)
-            end
-            local svStatus = cachedSv
-            if svStatus then
-                if cfg.Aim and cfg.SpectateDetect then
-                    if spectator.watching then
-                        svStatus.Text = "status: watched by " .. (spectator.who and spectator.who.Name or "?")
-                        svStatus.TextColor3 = TH.Danger
-                    else svStatus.Text = "status: clear"; svStatus.TextColor3 = TH.On end
-                else svStatus.Text = "status: off"; svStatus.TextColor3 = TH.TextMute end
-            end
-        end
-    end)
+    -- FIX #18: svStatus created first, then poller starts
     do
         local aimViewer = nil
         for _, ch in ipairs(pages["aim"]:GetDescendants()) do
@@ -3534,6 +3545,24 @@ function StartScript(plf)
             svStatus.TextXAlignment = Enum.TextXAlignment.Left
             svStatus.ZIndex = 8
             svStatus.LayoutOrder = 99
+
+            task.spawn(function()
+                local cachedSv = svStatus
+                while g and g.Parent do
+                    task.wait(0.25)
+                    if not cachedSv or not cachedSv.Parent then
+                        cachedSv = g:FindFirstChild("svStatus", true)
+                    end
+                    if cachedSv then
+                        if cfg.Aim and cfg.SpectateDetect then
+                            if spectator.watching then
+                                cachedSv.Text = "status: watched by " .. (spectator.who and spectator.who.Name or "?")
+                                cachedSv.TextColor3 = TH.Danger
+                            else cachedSv.Text = "status: clear"; cachedSv.TextColor3 = TH.On end
+                        else cachedSv.Text = "status: off"; cachedSv.TextColor3 = TH.TextMute end
+                    end
+                end
+            end)
         end
     end
 
@@ -3554,7 +3583,7 @@ function StartScript(plf)
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
-        local d = { 
+        local d = {
             L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), HPText=mkText(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(),
             C_Lines = {},
         }
@@ -3566,10 +3595,10 @@ function StartScript(plf)
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
-        if d.Name then 
+        if d.Name then
             d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor
             d.Name.Outline = true
-            d.Name.OutlineColor = Color3.new(0,0,0) 
+            d.Name.OutlineColor = Color3.new(0,0,0)
         end
         for i = 1, 8 do
             local l = mkLine()
@@ -3639,7 +3668,8 @@ function StartScript(plf)
             end
         end
     end
-    function buildCrosshair()
+    -- FIX #16: buildCrosshair is now a local, defined before UI usage
+    local function buildCrosshair()
         for _, o in ipairs(crosshairParts) do pcall(function() o:Remove() end) end
         crosshairParts = {}
         if not cfg.Crosshair then return end
@@ -3850,11 +3880,13 @@ function StartScript(plf)
                 if pt and pt.Parent and pt.CanCollide then pt.CanCollide = false end
             end
         end
+        -- FIX #5: Spin is now framerate-independent (per-second)
         if cfg.Spin and not cfg.AntiAimEnabled and p.Character and p.Character.PrimaryPart then
             local spHrp = p.Character:FindFirstChild("HumanoidRootPart")
             if spHrp then
                 local spVel = spHrp.AssemblyLinearVelocity
-                p.Character:PivotTo(p.Character.PrimaryPart.CFrame * CFrame.Angles(0, math.rad(cfg.SpinSpeed), 0))
+                local spinRad = math.rad(cfg.SpinSpeed) * dt * 60
+                p.Character:PivotTo(p.Character.PrimaryPart.CFrame * CFrame.Angles(0, spinRad, 0))
                 spHrp.AssemblyLinearVelocity = spVel
             end
         end
@@ -3917,7 +3949,7 @@ function StartScript(plf)
                         local ht = math.abs(bS.Y - tS.Y); local wd = ht / 1.6
                         local tSy = tS.Y
                         local psx, psy = ps.X, ps.Y
-                        
+
                         if d.B then
                             if cBox and cfg.BoxStyle == "2D" then
                                 if not d.B.Visible then d.B.Visible = true end
@@ -3931,8 +3963,8 @@ function StartScript(plf)
                                 local tL, tR = Vector2.new(psx - wd*0.5, tSy), Vector2.new(psx + wd*0.5, tSy)
                                 local bL, bR = Vector2.new(psx - wd*0.5, tSy + ht), Vector2.new(psx + wd*0.5, tSy + ht)
                                 local cL = math.min(wd, ht) * 0.2
-                                
-                                local pairs = {
+                                -- FIX #4: renamed 'pairs' to 'corners' (no shadow)
+                                local corners = {
                                     {tL, tL + Vector2.new(cL, 0)}, {tL, tL + Vector2.new(0, cL)},
                                     {tR, tR - Vector2.new(cL, 0)}, {tR, tR + Vector2.new(0, cL)},
                                     {bL, bL + Vector2.new(cL, 0)}, {bL, bL - Vector2.new(0, cL)},
@@ -3942,7 +3974,7 @@ function StartScript(plf)
                                     local ln = d.C_Lines[i]
                                     if ln then
                                         ln.Visible = true; ln.Color = cBoxCol; ln.Thickness = cBoxTh
-                                        setLinePoints(ln, pairs[i][1], pairs[i][2])
+                                        setLinePoints(ln, corners[i][1], corners[i][2])
                                     end
                                 end
                             else
@@ -4154,7 +4186,9 @@ function StartScript(plf)
                 local ddx, ddy = sx - halfX, sy - halfY
                 return inFovShape(ddx, ddy, cFovSize, fovShape)
             end
-            for pl in pairs(cachedPlayers) do
+            -- FIX #10 / #14: iterate array for deterministic tie-break
+            for idx = 1, #cachedPlayerList do
+                local pl = cachedPlayerList[idx]
                 if v_cached(pl) and (targetAll or targetList[pl.Name]) then
                     local ch = pl.Character
                     if useNearest then
@@ -4209,7 +4243,7 @@ function StartScript(plf)
             local ks = _G.__zeva_killStatsGui
             if not ks or not ks.sg or not ks.sg.Parent then
                 local sg = Instance.new("ScreenGui", p.PlayerGui)
-                sg.Name = "zeva_ks_"..tostring(math.random(1e6,9e6)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Name = "zeva_ks_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
                 local lbl = Instance.new("TextLabel", sg)
                 lbl.Size, lbl.Position, lbl.BackgroundColor3, lbl.BackgroundTransparency =
                     UDim2.new(0,200,0,40), UDim2.new(1,-210,0,10), TH.Bg, 0.35
@@ -4235,7 +4269,7 @@ function StartScript(plf)
         if cfg.KillFeed then
             if not _G.__zeva_killFeedGui or not _G.__zeva_killFeedGui.sg or not _G.__zeva_killFeedGui.sg.Parent then
                 local sg = Instance.new("ScreenGui", p.PlayerGui)
-                sg.Name = "zeva_kf_"..tostring(math.random(1e6,9e6)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Name = "zeva_kf_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
                 local holder = Instance.new("Frame", sg)
                 holder.Size, holder.Position, holder.BackgroundTransparency = UDim2.new(0,260,0,200), UDim2.new(1,-270,1,-220), 1
                 local lay = Instance.new("UIListLayout", holder)
@@ -4272,21 +4306,21 @@ function StartScript(plf)
         if radarTick and cfg.Radar then
             if not _G.__zeva_radarGui or not _G.__zeva_radarGui.sg or not _G.__zeva_radarGui.sg.Parent then
                 local sg = Instance.new("ScreenGui", p.PlayerGui)
-                sg.Name = "zeva_radar_"..tostring(math.random(1e6,9e6)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Name = "zeva_radar_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
                 local frame = Instance.new("Frame", sg)
                 frame.Size, frame.Position, frame.BackgroundColor3, frame.BackgroundTransparency, frame.BorderSizePixel, frame.ClipsDescendants =
                     UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize), UDim2.new(0,20,0,100), TH.Bg, 0.35, 0, true
                 round(frame, 12); stroke(frame, TH.LineHi, 1, 0.4)
                 local holder = Instance.new("Frame", frame)
                 holder.Size, holder.BackgroundTransparency = UDim2.new(1,0,1,0), 1
-                
+
                 local selfContainer = Instance.new("Frame", holder)
                 selfContainer.Size = UDim2.new(0, 20, 0, 20)
                 selfContainer.AnchorPoint = Vector2.new(0.5, 0.5)
                 selfContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
                 selfContainer.BackgroundTransparency = 1
                 selfContainer.ZIndex = 2
-                
+
                 local selfLine = Instance.new("Frame", selfContainer)
                 selfLine.Size = UDim2.new(0, 2, 0, 8)
                 selfLine.AnchorPoint = Vector2.new(0.5, 1)
@@ -4295,7 +4329,7 @@ function StartScript(plf)
                 selfLine.BorderSizePixel = 0
                 round(selfLine, 1)
                 selfLine.ZIndex = 2
-                
+
                 local selfDot = Instance.new("Frame", selfContainer)
                 selfDot.Size, selfDot.BackgroundColor3, selfDot.BorderSizePixel = UDim2.new(0,6,0,6), cfg.RadarSelfColor, 0
                 selfDot.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -4309,10 +4343,10 @@ function StartScript(plf)
             if rd.frame.Size.X.Offset ~= cfg.RadarSize then rd.frame.Size = UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize) end
             local half = cfg.RadarSize * 0.5
             local range = cfg.RadarRange
-            
+
             local targetCamYaw = math.atan2(camCF.LookVector.X, -camCF.LookVector.Z)
             if rd.lastYaw == nil then rd.lastYaw = targetCamYaw end
-            
+
             if rd.selfDot then rd.selfDot.BackgroundColor3 = cfg.RadarSelfColor end
             if rd.selfLine then rd.selfLine.BackgroundColor3 = cfg.RadarSelfColor end
 
@@ -4322,8 +4356,9 @@ function StartScript(plf)
 
             local dots = rd.dots
             local idx = 0
+            -- FIX #6: radar respects KO/death state
             for pl in pairs(cachedPlayers) do
-                if pl ~= p then
+                if pl ~= p and not isKOorDead_cached(pl) then
                     local ch = pl.Character
                     if ch then
                         local hrp = ch:FindFirstChild("HumanoidRootPart")
@@ -4339,15 +4374,16 @@ function StartScript(plf)
                                     container.AnchorPoint = Vector2.new(0.5, 0.5)
                                     container.BackgroundTransparency = 1
                                     container.ZIndex = 2
-                                    
+
+                                    -- FIX #7: pivot aim line at the dot, not its base
                                     local aimLine = Instance.new("Frame", container)
                                     aimLine.Size = UDim2.new(0, 2, 0, 10)
-                                    aimLine.AnchorPoint = Vector2.new(0.5, 1)
-                                    aimLine.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    aimLine.AnchorPoint = Vector2.new(0.5, 0.5)
+                                    aimLine.Position = UDim2.new(0.5, 0, 0.5, -5)
                                     aimLine.BorderSizePixel = 0
                                     round(aimLine, 1)
                                     aimLine.ZIndex = 2
-                                    
+
                                     local dot = Instance.new("Frame", container)
                                     dot.Size = UDim2.new(0, 6, 0, 6)
                                     dot.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -4355,20 +4391,20 @@ function StartScript(plf)
                                     dot.BorderSizePixel = 0
                                     round(dot, 3)
                                     dot.ZIndex = 3
-                                    
+
                                     dItem = {container = container, aimLine = aimLine, dot = dot}
                                     dots[idx] = dItem
                                 end
-                                
+
                                 local targetAngle = math.atan2(rel.X, -rel.Z)
                                 local relAngle = targetAngle - camYaw
-                                
+
                                 local sx = half + math.sin(relAngle) * (dist / range) * half
                                 local sy = half - math.cos(relAngle) * (dist / range) * half
-                                
+
                                 dItem.container.Position = UDim2.new(0, sx, 0, sy)
                                 dItem.container.Visible = true
-                                
+
                                 local isTeammate = cfg.TeamCheck and pl.Team and p.Team and pl.Team == p.Team
                                 local dotCol = isTeammate and cfg.RadarTeamColor or cfg.RadarEnemyColor
                                 dItem.dot.BackgroundColor3 = dotCol
@@ -4394,7 +4430,7 @@ function StartScript(plf)
         if cfg.FPSOverlay then
             if not _G.__zeva_fpsGui or not _G.__zeva_fpsGui.sg or not _G.__zeva_fpsGui.sg.Parent then
                 local sg = Instance.new("ScreenGui", p.PlayerGui)
-                sg.Name = "zeva_fps_"..tostring(math.random(1e6,9e6)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Name = "zeva_fps_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
                 local lbl = Instance.new("TextLabel", sg)
                 lbl.Size, lbl.Position, lbl.BackgroundColor3, lbl.BackgroundTransparency = UDim2.new(0,200,0,24), UDim2.new(1,-210,0,10), TH.Bg, 0.4
                 lbl.TextColor3, lbl.Font, lbl.TextSize, lbl.BorderSizePixel, lbl.Text, lbl.TextXAlignment =
@@ -4430,15 +4466,18 @@ function StartScript(plf)
                         local hitPl = model and P:GetPlayerFromCharacter(model)
                         if hitPl and v(hitPl) then
                             local hd = (result.Position - ray.Origin).Magnitude
-                            if hd <= cfg.MaxTriggerDist and (not cfg.WallCheck or vis(result.Instance)) then
+                            -- FIX #8 / #9: wallcheck is redundant (raycast already filtered), corrected input event args
+                            if hd <= cfg.MaxTriggerDist then
                                 pcall(function()
                                     if plf == "Mobile" then
-                                        VIM:SendTouchEvent(99, 1, scx, scy)
+                                        -- UserInputState.Begin=0, Change=1, End=2
+                                        VIM:SendTouchEvent(99, 0, scx, scy)
                                         task.wait(0.02)
-                                        VIM:SendTouchEvent(99, 3, scx, scy)
+                                        VIM:SendTouchEvent(99, 2, scx, scy)
                                     else
-                                        VIM:SendMouseButtonEvent(scx, scy, 0, true, game, 1)
-                                        VIM:SendMouseButtonEvent(scx, scy, 0, false, game, 1)
+                                        -- gameProcessed=false (5th arg must be boolean, not Instance)
+                                        VIM:SendMouseButtonEvent(scx, scy, 0, true, false, 1)
+                                        VIM:SendMouseButtonEvent(scx, scy, 0, false, false, 1)
                                     end
                                 end)
                                 lastT = tick() + math.max(0.03, math.random() * cfg.RandDelay)

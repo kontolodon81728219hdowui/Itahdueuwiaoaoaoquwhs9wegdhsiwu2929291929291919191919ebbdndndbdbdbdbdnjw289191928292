@@ -1,10 +1,10 @@
 -- ============================================================
--- Zeva v8.4.2 — VIBECODED (LookTracer Fixed)
+-- Zeva v8.5.1 — VIBECODED (ESP Overhaul)
 -- ============================================================
 -- [C] upgrades:
---   - LookTracer is a single, clean line now (no more arrowhead)
---   - Fixed the LookTracer disappearing when tip is off-screen
---   - Kept the smooth Pulse (Animate) and Transparency options
+--   - Fixed Health Bar (Line based, no more black boxes)
+--   - Added "Middle" to Tracer Origins
+--   - Corner Box style, LookTracer fixed, Hit Chams fade
 -- ============================================================
 
 -- ============================================================
@@ -73,7 +73,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.4.2
+-- Zeva v8.5.1
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -449,29 +449,6 @@ local function termWindow(parent, title, w, h)
     return outer, body, s
 end
 
--- TEXT SCRAMBLE EFFECT
-local function scrambleText(label, finalText, duration)
-    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"
-    local taskThread = task.spawn(function()
-        local startTime = tick()
-        while tick() - startTime < duration do
-            local result = ""
-            for i = 1, #finalText do
-                if i / #finalText < (tick() - startTime) / duration then
-                    result = result .. finalText:sub(i, i)
-                else
-                    local randIdx = math.random(1, #chars)
-                    result = result .. chars:sub(randIdx, randIdx)
-                end
-            end
-            if label then label.Text = result end
-            task.wait(0.03)
-        end
-        if label then label.Text = finalText end
-    end)
-    return taskThread
-end
-
 function buildSelector()
     clearSelectors()
     local chG = Instance.new("ScreenGui", p.PlayerGui)
@@ -504,7 +481,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.4.2", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.5.1", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -1011,6 +988,7 @@ function StartScript(plf)
         NameColor=Color3.fromRGB(255,255,255), NameSize=12,
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
+        BoxStyle="2D", TracerOrigin="Top", ShowHPText=false,
         Radar=false, RadarSize=140, RadarRange=200,
         RadarEnemyColor=Color3.fromRGB(244,106,122), RadarTeamColor=Color3.fromRGB(120,220,165), RadarSelfColor=Color3.fromRGB(150,130,255),
         AntiAimEnabled=false, AntiAimMode="Static", AntiAimPitch=0, AntiAimYaw=180, AntiAimSpinSpeed=8,
@@ -1440,7 +1418,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.4.2", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.5.1", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -2658,13 +2636,64 @@ function StartScript(plf)
         BUILD_PAGE = "esp"
         local s = section(pages["esp"], "visuals")
         toggle(s, "Box", "Box", false, function(v) cfg.Box = v end)
+        
+        local boxStyleRow = Instance.new("Frame", s)
+        boxStyleRow.Size, boxStyleRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
+        boxStyleRow.ZIndex = 7
+        local bsl = Instance.new("TextLabel", boxStyleRow)
+        bsl.Size, bsl.BackgroundTransparency, bsl.Text, bsl.TextColor3, bsl.Font, bsl.TextSize =
+            UDim2.new(0.4,0,1,0), 1, "Box Style", TH.Text, FONT, 12
+        bsl.TextXAlignment = Enum.TextXAlignment.Left
+        bsl.ZIndex = 8
+        local bsOpts = {"2D", "Corner"}
+        local bsIdx = 1
+        for i, vv in ipairs(bsOpts) do if vv == cfg.BoxStyle then bsIdx = i end end
+        local bsBtn = Instance.new("TextButton", boxStyleRow)
+        bsBtn.Size, bsBtn.Position, bsBtn.BackgroundColor3, bsBtn.Text, bsBtn.TextColor3, bsBtn.Font, bsBtn.TextSize =
+            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.BoxStyle, TH.Accent, FONTB, 11
+        bsBtn.AutoButtonColor, bsBtn.BorderSizePixel = false, 0
+        bsBtn.ZIndex = 8
+        round(bsBtn, 8); stroke(bsBtn, TH.LineHi, 1, 0.4); regAccent(bsBtn, "TextColor3")
+        bsBtn.MouseButton1Click:Connect(function()
+            bsIdx = bsIdx % #bsOpts + 1
+            cfg.BoxStyle = bsOpts[bsIdx]
+            bsBtn.Text = cfg.BoxStyle
+        end)
+        regFeature("Box Style", BUILD_PAGE, boxStyleRow)
+
         toggle(s, "Filled Box", "BoxFilled", false, function(v) cfg.BoxFilled = v end)
         toggle(s, "Bones", "Bone", false, function(v) cfg.Bone = v end)
         toggle(s, "Health Bar", "Health", false, function(v) cfg.Health = v end)
+        toggle(s, "HP Text", "ShowHPText", false, function(v) cfg.ShowHPText = v end)
         toggle(s, "Distance", "Dist", false, function(v) cfg.Dist = v end)
         toggle(s, "Name ESP", "NameESP", false, function(v) cfg.NameESP = v end)
         toggle(s, "Hit Chams", "Chams", false, function(v) cfg.Chams = v end)
         toggle(s, "Tracer", "Tracer", false, function(v) cfg.Tracer = v end)
+        
+        local tracerOrgRow = Instance.new("Frame", s)
+        tracerOrgRow.Size, tracerOrgRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
+        tracerOrgRow.ZIndex = 7
+        local tol = Instance.new("TextLabel", tracerOrgRow)
+        tol.Size, tol.BackgroundTransparency, tol.Text, tol.TextColor3, tol.Font, tol.TextSize =
+            UDim2.new(0.4,0,1,0), 1, "Tracer Origin", TH.Text, FONT, 12
+        tol.TextXAlignment = Enum.TextXAlignment.Left
+        tol.ZIndex = 8
+        local toOpts = {"Top", "Bottom", "Middle"}
+        local toIdx = 1
+        for i, vv in ipairs(toOpts) do if vv == cfg.TracerOrigin then toIdx = i end end
+        local toBtn = Instance.new("TextButton", tracerOrgRow)
+        toBtn.Size, toBtn.Position, toBtn.BackgroundColor3, toBtn.Text, toBtn.TextColor3, toBtn.Font, toBtn.TextSize =
+            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.TracerOrigin, TH.Accent, FONTB, 11
+        toBtn.AutoButtonColor, toBtn.BorderSizePixel = false, 0
+        toBtn.ZIndex = 8
+        round(toBtn, 8); stroke(toBtn, TH.LineHi, 1, 0.4); regAccent(toBtn, "TextColor3")
+        toBtn.MouseButton1Click:Connect(function()
+            toIdx = toIdx % #toOpts + 1
+            cfg.TracerOrigin = toOpts[toIdx]
+            toBtn.Text = cfg.TracerOrigin
+        end)
+        regFeature("Tracer Origin", BUILD_PAGE, tracerOrgRow)
+
         toggle(s, "Look Tracer", "LookTracer", false, function(v) cfg.LookTracer = v end)
         local s2 = section(pages["esp"], "filters")
         toggle(s2, "Team Check", "TeamCheck", false, function(v) cfg.TeamCheck = v end)
@@ -3585,11 +3614,15 @@ function StartScript(plf)
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
-        local d = { L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText() }
+        local d = { 
+            L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), HPText=mkText(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(),
+            C_Lines = {}, -- 8 lines for corner box
+        }
         if d.B then d.B.Thickness, d.B.Color, d.B.Filled = cfg.BoxThickness, cfg.BoxColor, false end
         if d.BF then d.BF.Thickness, d.BF.Color, d.BF.Filled, d.BF.Transparency = 0, cfg.BoxFilledColor, true, cfg.BoxFilledTransparency end
-        if d.HB then d.HB.Thickness, d.HB.Color = cfg.HealthThickness, cfg.HealthColor end
-        if d.HM then d.HM.Thickness = cfg.HealthThickness end
+        if d.HB then d.HB.Thickness, d.HB.Color = cfg.HealthThickness + 2, Color3.new(0,0,0) end
+        if d.HM then d.HM.Thickness, d.HM.Color = cfg.HealthThickness, cfg.HealthColor end
+        if d.HPText then d.HPText.Size, d.HPText.Center, d.HPText.Color = 12, true, cfg.HealthColor; d.HPText.Outline = true; d.HPText.OutlineColor = Color3.new(0,0,0) end
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
@@ -3597,6 +3630,11 @@ function StartScript(plf)
             d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor
             d.Name.Outline = true
             d.Name.OutlineColor = Color3.new(0,0,0) 
+        end
+        for i = 1, 8 do
+            local l = mkLine()
+            if l then l.Thickness, l.Color = cfg.BoxThickness, cfg.BoxColor end
+            table.insert(d.C_Lines, l)
         end
         dr[pl] = d
         for i = 1, BONE_PAIRS_COUNT do
@@ -3650,6 +3688,7 @@ function StartScript(plf)
                         data.sq.Size = Vector2.new(w, h)
                         data.sq.Position = Vector2.new(ps.X - w/2, tS.Y)
                         data.sq.Visible = on and ps.Z > 0
+                        data.sq.Transparency = 0.65 * math.clamp((data.expiresAt - now) / 2, 0, 1)
                     else data.sq.Visible = false end
                 else data.sq.Visible = false end
             end
@@ -3916,13 +3955,37 @@ function StartScript(plf)
                         local tSy = tS.Y
                         local psx, psy = ps.X, ps.Y
                         
+                        -- Box Styles
                         if d.B then
-                            if cBox then
+                            if cBox and cfg.BoxStyle == "2D" then
                                 if not d.B.Visible then d.B.Visible = true end
                                 d.B.Size = Vector2.new(wd, ht)
                                 d.B.Position = Vector2.new(psx - wd*0.5, tSy)
                                 d.B.Color = cBoxCol; d.B.Thickness = cBoxTh; d.B.Filled = false
                             elseif d.B.Visible then d.B.Visible = false end
+                        end
+                        if d.C_Lines then
+                            if cBox and cfg.BoxStyle == "Corner" then
+                                local tL, tR = Vector2.new(psx - wd*0.5, tSy), Vector2.new(psx + wd*0.5, tSy)
+                                local bL, bR = Vector2.new(psx - wd*0.5, tSy + ht), Vector2.new(psx + wd*0.5, tSy + ht)
+                                local cL = math.min(wd, ht) * 0.2
+                                
+                                local pairs = {
+                                    {tL, tL + Vector2.new(cL, 0)}, {tL, tL + Vector2.new(0, cL)},
+                                    {tR, tR - Vector2.new(cL, 0)}, {tR, tR + Vector2.new(0, cL)},
+                                    {bL, bL + Vector2.new(cL, 0)}, {bL, bL - Vector2.new(0, cL)},
+                                    {bR, bR - Vector2.new(cL, 0)}, {bR, bR - Vector2.new(0, cL)},
+                                }
+                                for i = 1, 8 do
+                                    local ln = d.C_Lines[i]
+                                    if ln then
+                                        ln.Visible = true; ln.Color = cBoxCol; ln.Thickness = cBoxTh
+                                        setLinePoints(ln, pairs[i][1], pairs[i][2])
+                                    end
+                                end
+                            else
+                                for i = 1, 8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end
+                            end
                         end
                         if d.BF then
                             if cBoxFilled then
@@ -3933,14 +3996,46 @@ function StartScript(plf)
                                 d.BF.Transparency = cBoxFillTrans
                             elseif d.BF.Visible then d.BF.Visible = false end
                         end
+                        
+                        -- Health Bar (Smart)
+                        if d.HB and d.HM and d.HPText then
+                            if cHealth then
+                                local bX = psx - wd*0.5 - 6
+                                local ratio = 1
+                                if hum.MaxHealth > 0 then ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1) end
+                                
+                                -- Background
+                                if not d.HB.Visible then d.HB.Visible = true end
+                                setLinePoints(d.HB, Vector2.new(bX, tSy), Vector2.new(bX, tSy + ht))
+                                d.HB.Color = Color3.new(0,0,0)
+                                d.HB.Thickness = cHpTh + 2
+                                
+                                -- Fill
+                                if not d.HM.Visible then d.HM.Visible = true end
+                                setLinePoints(d.HM, Vector2.new(bX, tSy + ht), Vector2.new(bX, tSy + ht - (ht * ratio)))
+                                d.HM.Color = Color3.fromHSV(ratio * 0.3, 1, 1)
+                                d.HM.Thickness = cHpTh
+                                
+                                -- HP Text
+                                if cfg.ShowHPText then
+                                    if not d.HPText.Visible then d.HPText.Visible = true end
+                                    d.HPText.Text = math.floor(hum.Health) .. ""
+                                    d.HPText.Position = Vector2.new(bX - 6, tSy + ht - (ht * ratio))
+                                    d.HPText.Color = Color3.fromHSV(ratio * 0.3, 1, 1)
+                                elseif d.HPText.Visible then d.HPText.Visible = false end
+                            else
+                                if d.HB.Visible then d.HB.Visible = false end
+                                if d.HM.Visible then d.HM.Visible = false end
+                                if d.HPText.Visible then d.HPText.Visible = false end
+                            end
+                        end
+
+                        -- Name ESP (Side)
                         if d.Name then
                             if cName then
                                 local sideX
-                                if cHealth then
-                                    sideX = psx + wd * 0.5 + 12
-                                else
-                                    sideX = psx - wd * 0.5 - 12
-                                end
+                                if cHealth then sideX = psx + wd * 0.5 + 12
+                                else sideX = psx - wd * 0.5 - 12 end
                                 d.Name.Visible = true
                                 d.Name.Text = pl.DisplayName
                                 d.Name.Position = Vector2.new(sideX, tSy + (ht * 0.5))
@@ -3949,23 +4044,10 @@ function StartScript(plf)
                                 d.Name.Center = true
                                 d.Name.Outline = true
                                 d.Name.OutlineColor = Color3.new(0, 0, 0)
-                            elseif d.Name.Visible then
-                                d.Name.Visible = false
-                            end
+                            elseif d.Name.Visible then d.Name.Visible = false end
                         end
-                        if d.HB and d.HM then
-                            if cHealth then
-                                local bX = psx - wd*0.5 - 6
-                                if not d.HB.Visible then d.HB.Visible = true end
-                                setLinePoints(d.HB, Vector2.new(bX, tSy), Vector2.new(bX, tSy + ht))
-                                d.HB.Color = cHpCol; d.HB.Thickness = cHpTh
-                                local ratio = 1
-                                if hum.MaxHealth > 0 then ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1) end
-                                if not d.HM.Visible then d.HM.Visible = true end
-                                setLinePoints(d.HM, Vector2.new(bX, tSy + ht), Vector2.new(bX, tSy + ht - (ht * ratio)))
-                                d.HM.Color = Color3.fromHSV(ratio * 0.3, 1, 1); d.HM.Thickness = cHpTh
-                            elseif d.HB.Visible or d.HM.Visible then d.HB.Visible = false; d.HM.Visible = false end
-                        end
+                        
+                        -- Distance
                         if d.D then
                             if cDist then
                                 if not d.D.Visible then d.D.Visible = true end
@@ -3974,13 +4056,21 @@ function StartScript(plf)
                                 d.D.Color = cDistCol; d.D.Size = cFontSz
                             elseif d.D.Visible then d.D.Visible = false end
                         end
+
+                        -- Tracer
                         if d.T then
                             if cTracer then
                                 if not d.T.Visible then d.T.Visible = true end
-                                setLinePoints(d.T, Vector2.new(halfX, 0), Vector2.new(psx, psy))
+                                local startY = 0
+                                if cfg.TracerOrigin == "Top" then startY = 0
+                                elseif cfg.TracerOrigin == "Bottom" then startY = vsy
+                                elseif cfg.TracerOrigin == "Middle" then startY = vsy * 0.5 end
+                                setLinePoints(d.T, Vector2.new(halfX, startY), Vector2.new(psx, psy))
                                 d.T.Color = cTrCol; d.T.Thickness = cTrTh
                             elseif d.T.Visible then d.T.Visible = false end
                         end
+
+                        -- LookTracer (Fixed)
                         if d.LT then
                             local originPart = cfg.LookTracerOrigin == "Body" and hrp or ch:FindFirstChild("Head")
                             if cLookTr and originPart then
@@ -3996,7 +4086,6 @@ function StartScript(plf)
                                     if cfg.LookTracerAnimate then
                                         baseTrans = baseTrans * (0.5 + 0.5 * math.sin(tick() * 8))
                                     end
-                                    
                                     if not d.LT.Visible then d.LT.Visible = true end
                                     setLinePoints(d.LT, Vector2.new(p1.X, p1.Y), Vector2.new(p2.X, p2.Y))
                                     d.LT.Color = cLtCol
@@ -4009,6 +4098,8 @@ function StartScript(plf)
                                 if d.LT.Visible then d.LT.Visible = false end
                             end
                         end
+
+                        -- Bones
                         if cBone then
                             local bp = ch:FindFirstChild("UpperTorso") and BONE_PAIRS_R15 or BONE_PAIRS_R6
                             local bpCount = #bp
@@ -4039,12 +4130,15 @@ function StartScript(plf)
                             end
                         end
                     else
+                        -- Hide everything if out of range
                         if d.B and d.B.Visible then d.B.Visible = false end
                         if d.BF and d.BF.Visible then d.BF.Visible = false end
+                        if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
                         if d.Name and d.Name.Visible then d.Name.Visible = false end
                         if d.D and d.D.Visible then d.D.Visible = false end
                         if d.HB and d.HB.Visible then d.HB.Visible = false end
                         if d.HM and d.HM.Visible then d.HM.Visible = false end
+                        if d.HPText and d.HPText.Visible then d.HPText.Visible = false end
                         if d.T and d.T.Visible then d.T.Visible = false end
                         if d.LT and d.LT.Visible then d.LT.Visible = false end
                         for i = 1, BONE_PAIRS_COUNT do
@@ -4056,10 +4150,12 @@ function StartScript(plf)
             else
                 if d.B and d.B.Visible then d.B.Visible = false end
                 if d.BF and d.BF.Visible then d.BF.Visible = false end
+                if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
                 if d.Name and d.Name.Visible then d.Name.Visible = false end
                 if d.D and d.D.Visible then d.D.Visible = false end
                 if d.HB and d.HB.Visible then d.HB.Visible = false end
                 if d.HM and d.HM.Visible then d.HM.Visible = false end
+                if d.HPText and d.HPText.Visible then d.HPText.Visible = false end
                 if d.T and d.T.Visible then d.T.Visible = false end
                 if d.LT and d.LT.Visible then d.LT.Visible = false end
                 for i = 1, BONE_PAIRS_COUNT do
@@ -4389,10 +4485,12 @@ function StartScript(plf)
             pcall(function() if d.Name then d.Name:Remove() end end)
             pcall(function() if d.HB then d.HB:Remove() end end)
             pcall(function() if d.HM then d.HM:Remove() end end)
+            pcall(function() if d.HPText then d.HPText:Remove() end end)
             pcall(function() if d.D then d.D:Remove() end end)
             pcall(function() if d.T then d.T:Remove() end end)
             pcall(function() if d.LT then d.LT:Remove() end end)
             for _, l in pairs(d.L) do pcall(function() if l then l:Remove() end end) end
+            for _, l in pairs(d.C_Lines) do pcall(function() if l then l:Remove() end end) end
             dr[pl] = nil
         end
         local hc = hitChams[pl]

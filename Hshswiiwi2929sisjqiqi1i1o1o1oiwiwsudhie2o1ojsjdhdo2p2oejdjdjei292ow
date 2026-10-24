@@ -14,7 +14,6 @@
 --   - Radar player names
 --   - clearSelectors catches all zeva_* GUIs
 --   - SpectateDelay shows "0.35s" suffix
---   - FIXED: aimlock no longer freezes on last position when target lost
 -- ============================================================
 
 -- ============================================================
@@ -4123,7 +4122,8 @@ function StartScript(plf)
                             local originPart = cfg.LookTracerOrigin == "Body" and hrp or ch:FindFirstChild("Head")
                             if cLookTr and originPart then
                                 local origin = originPart.Position
-                                local direction = originPart.CFrame.LookVector                                local tipPos = origin + direction * cfg.LookTracerLength
+                                local direction = originPart.CFrame.LookVector
+                                local tipPos = origin + direction * cfg.LookTracerLength
                                 local p1, on1 = c:WorldToViewportPoint(origin)
                                 local p2, on2 = c:WorldToViewportPoint(tipPos)
                                 if p1.Z > 0 and p2.Z > 0 then
@@ -4278,28 +4278,21 @@ function StartScript(plf)
             end
         end
 
-        -- FIXED: sticky / release — clears currentAimPos when no target
-        if cAim and not menuOpen then
-            if not foundTarget then
-                local stickyActive = false
-                if cfg.StickyAim and lastStickyTarget and tick() - lastStickyTime < cfg.StickyDuration then
-                    local ch = lastStickyTarget.Character
-                    if ch then
-                        local part = ch:FindFirstChild("Head")
-                        if part and (not cfg.WallCheck or vis(part)) then
-                            currentAimPos = part.Position
-                            stickyActive = true
-                        end
-                    end
-                end
-                if not stickyActive then
+        if cAim and not menuOpen and not foundTarget and cfg.StickyAim and lastStickyTarget then
+            if tick() - lastStickyTime < cfg.StickyDuration then
+                local ch = lastStickyTarget.Character
+                if ch then
+                    local part = ch:FindFirstChild("Head")
+                    currentAimPos = part and part.Position or nil
+                else
                     currentAimPos = nil
-                    lastStickyTarget = nil
                 end
+            else
+                currentAimPos = nil
+                lastStickyTarget = nil
             end
-        else
+        elseif not cAim or menuOpen then
             currentAimPos = nil
-            lastStickyTarget = nil
         end
 
         if cfg.KillStats then

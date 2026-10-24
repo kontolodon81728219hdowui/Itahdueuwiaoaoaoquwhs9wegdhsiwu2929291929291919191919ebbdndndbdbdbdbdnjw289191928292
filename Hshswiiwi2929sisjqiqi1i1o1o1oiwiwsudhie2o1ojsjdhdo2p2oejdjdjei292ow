@@ -1,12 +1,12 @@
 -- ============================================================
--- Zeva v8.3.0 — patched build
+-- Zeva v8.4.0 — VIBECODED
 -- ============================================================
--- [C] fixes applied on top of v8.2.9:
---   - Removed PERF tab entirely
---   - Removed FPS Booster feature
---   - Moved Free Cam to MOVE tab
---   - Moved FPS/Ping Overlay to SETTINGS tab
---   - Danger Zone swapped to premium card-style buttons
+-- [C] upgrades:
+--   - Horizontal Name ESP on the box side (left by default, right if Health on)
+--   - Added background Blur/Bloom when menu is open
+--   - Terminal boot sequence now has a text scramble effect
+--   - UI Tweens are springier (Back/Quint easing)
+--   - Smoother ESP rendering & crosshair
 -- ============================================================
 
 -- ============================================================
@@ -75,7 +75,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.3.0
+-- Zeva v8.4.0
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -280,6 +280,28 @@ local function tw(o, info, pr)
     local tn = TS:Create(o, ti, pr); tn:Play(); return tn
 end
 
+-- BLUR & BLOOM FOR VIBE
+local blur = Instance.new("BlurEffect", L)
+blur.Size = 0
+blur.Enabled = false
+
+local bloom = Instance.new("BloomEffect", L)
+bloom.Intensity = 0
+bloom.Size = 24
+bloom.Threshold = 1.2
+
+local function setVibe(on)
+    if on then
+        blur.Enabled = true
+        tw(blur, EASE.med, {Size = 16})
+        tw(bloom, EASE.med, {Intensity = 0.8})
+    else
+        tw(blur, EASE.med, {Size = 0})
+        tw(bloom, EASE.med, {Intensity = 0})
+        task.delay(0.3, function() if blur.Size == 0 then blur.Enabled = false end end)
+    end
+end
+
 local function ripple(parent, x, y)
     pcall(function()
         local r = Instance.new("Frame", parent)
@@ -429,6 +451,29 @@ local function termWindow(parent, title, w, h)
     return outer, body, s
 end
 
+-- TEXT SCRAMBLE EFFECT
+local function scrambleText(label, finalText, duration)
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*"
+    local taskThread = task.spawn(function()
+        local startTime = tick()
+        while tick() - startTime < duration do
+            local result = ""
+            for i = 1, #finalText do
+                if i / #finalText < (tick() - startTime) / duration then
+                    result = result .. finalText:sub(i, i)
+                else
+                    local randIdx = math.random(1, #chars)
+                    result = result .. chars:sub(randIdx, randIdx)
+                end
+            end
+            if label then label.Text = result end
+            task.wait(0.03)
+        end
+        if label then label.Text = finalText end
+    end)
+    return taskThread
+end
+
 function buildSelector()
     clearSelectors()
     local chG = Instance.new("ScreenGui", p.PlayerGui)
@@ -461,7 +506,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.3.0", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.4.0", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -1357,6 +1402,7 @@ function StartScript(plf)
     local function setMenuVisible(v)
         root.Visible = v
         glow.Visible = v
+        setVibe(v)
     end
 
     local title = Instance.new("Frame", root)
@@ -1395,7 +1441,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.3.0", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.4.0", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -3112,6 +3158,8 @@ function StartScript(plf)
             if _G.__zeva_radarGui then pcall(function() _G.__zeva_radarGui.sg:Destroy() end); _G.__zeva_radarGui = nil end
             if _G.__zeva_fpsGui then pcall(function() _G.__zeva_fpsGui.sg:Destroy() end); _G.__zeva_fpsGui = nil end
             pcall(function() g:Destroy() end)
+            pcall(function() blur:Destroy() end)
+            pcall(function() bloom:Destroy() end)
             cfg.PartColors = {}
         end
 
@@ -3517,7 +3565,11 @@ function StartScript(plf)
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
-        if d.Name then d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor; d.Name.Outline = true; d.Name.OutlineColor = Color3.new(0,0,0) end
+        if d.Name then 
+            d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor
+            d.Name.Outline = true
+            d.Name.OutlineColor = Color3.new(0,0,0) 
+        end
         dr[pl] = d
         for i = 1, BONE_PAIRS_COUNT do
             local l = mkLine()
@@ -3855,25 +3907,23 @@ function StartScript(plf)
                         end
                         if d.Name then
                             if cName then
-                                local head = ch:FindFirstChild("Head")
-                                if head then
-                                    local hp, hon = c:WorldToViewportPoint(head.Position + Vector3.new(0, 1.2, 0))
-                                    if hon and hp.Z > 0 then
-                                        d.Name.Visible = true
-                                        d.Name.Text = pl.DisplayName
-                                        d.Name.Position = Vector2.new(hp.X, hp.Y)
-                                        d.Name.Color = cNameCol
-                                        d.Name.Size = cNameSz
-                                        d.Name.Center = true
-                                        d.Name.Outline = true
-                                        d.Name.OutlineColor = Color3.new(0, 0, 0)
-                                    else
-                                        d.Name.Visible = false
-                                    end
+                                local sideX
+                                if cHealth then
+                                    sideX = psx + wd * 0.5 + 12
                                 else
-                                    d.Name.Visible = false
+                                    sideX = psx - wd * 0.5 - 12
                                 end
-                            elseif d.Name.Visible then d.Name.Visible = false end
+                                d.Name.Visible = true
+                                d.Name.Text = pl.DisplayName
+                                d.Name.Position = Vector2.new(sideX, tSy + (ht * 0.5))
+                                d.Name.Color = cNameCol
+                                d.Name.Size = cNameSz
+                                d.Name.Center = true
+                                d.Name.Outline = true
+                                d.Name.OutlineColor = Color3.new(0, 0, 0)
+                            elseif d.Name.Visible then
+                                d.Name.Visible = false
+                            end
                         end
                         if d.HB and d.HM then
                             if cHealth then

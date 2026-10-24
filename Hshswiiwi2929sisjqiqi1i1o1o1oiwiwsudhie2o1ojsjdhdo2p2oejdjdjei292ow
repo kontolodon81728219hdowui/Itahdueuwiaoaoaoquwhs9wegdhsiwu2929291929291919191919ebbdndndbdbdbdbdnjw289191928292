@@ -1,12 +1,10 @@
 -- ============================================================
--- Zeva v8.4.0 — VIBECODED
+-- Zeva v8.4.2 — VIBECODED (LookTracer Fixed)
 -- ============================================================
 -- [C] upgrades:
---   - Horizontal Name ESP on the box side (left by default, right if Health on)
---   - Added background Blur/Bloom when menu is open
---   - Terminal boot sequence now has a text scramble effect
---   - UI Tweens are springier (Back/Quint easing)
---   - Smoother ESP rendering & crosshair
+--   - LookTracer is a single, clean line now (no more arrowhead)
+--   - Fixed the LookTracer disappearing when tip is off-screen
+--   - Kept the smooth Pulse (Animate) and Transparency options
 -- ============================================================
 
 -- ============================================================
@@ -75,7 +73,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.4.0
+-- Zeva v8.4.2
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -506,7 +504,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.4.0", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.4.2", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -1009,6 +1007,7 @@ function StartScript(plf)
         BoxColor=Color3.fromRGB(255,255,255), BoneColor=Color3.fromRGB(255,255,255),
         HealthColor=Color3.fromRGB(0,255,0), DistanceColor=Color3.fromRGB(255,255,255),
         TracerColor=Color3.fromRGB(255,255,255), LookTracerColor=Color3.fromRGB(255,0,0),
+        LookTracerLength=15, LookTracerOrigin="Head", LookTracerTransparency=1, LookTracerAnimate=false,
         NameColor=Color3.fromRGB(255,255,255), NameSize=12,
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
@@ -1441,7 +1440,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.4.0", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.4.2", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -2677,7 +2676,36 @@ function StartScript(plf)
         colorRow(s3, "Bone Color", "BoneColor")
         colorRow(s3, "Health Color", "HealthColor"); colorRow(s3, "Distance Color", "DistanceColor")
         colorRow(s3, "Name Color", "NameColor"); colorRow(s3, "Tracer Color", "TracerColor")
+        
         colorRow(s3, "LookTracer Color", "LookTracerColor")
+        numInput(s3, "LookTracer Length", "LookTracerLength", 15)
+        slider(s3, "LookTracer Transparency", "LookTracerTransparency", 0, 1, 1, function(v) cfg.LookTracerTransparency = v end, 2)
+        toggle(s3, "Animate LookTracer", "LookTracerAnimate", false, function(v) cfg.LookTracerAnimate = v end)
+
+        local ltOrgRow = Instance.new("Frame", s3)
+        ltOrgRow.Size, ltOrgRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
+        ltOrgRow.ZIndex = 7
+        local orgLbl = Instance.new("TextLabel", ltOrgRow)
+        orgLbl.Size, orgLbl.BackgroundTransparency, orgLbl.Text, orgLbl.TextColor3, orgLbl.Font, orgLbl.TextSize =
+            UDim2.new(0.4,0,1,0), 1, "LookTracer Origin", TH.Text, FONT, 12
+        orgLbl.TextXAlignment = Enum.TextXAlignment.Left
+        orgLbl.ZIndex = 8
+        local orgOpts = {"Head", "Body"}
+        local orgIdx = 1
+        for i, vv in ipairs(orgOpts) do if vv == cfg.LookTracerOrigin then orgIdx = i end end
+        local orgBtn = Instance.new("TextButton", ltOrgRow)
+        orgBtn.Size, orgBtn.Position, orgBtn.BackgroundColor3, orgBtn.Text, orgBtn.TextColor3, orgBtn.Font, orgBtn.TextSize =
+            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.LookTracerOrigin, TH.Accent, FONTB, 11
+        orgBtn.AutoButtonColor, orgBtn.BorderSizePixel = false, 0
+        orgBtn.ZIndex = 8
+        round(orgBtn, 8); stroke(orgBtn, TH.LineHi, 1, 0.4); regAccent(orgBtn, "TextColor3")
+        orgBtn.MouseButton1Click:Connect(function()
+            orgIdx = orgIdx % #orgOpts + 1
+            cfg.LookTracerOrigin = orgOpts[orgIdx]
+            orgBtn.Text = cfg.LookTracerOrigin
+        end)
+        regFeature("LookTracer Origin", BUILD_PAGE, ltOrgRow)
+
         numInput(s3, "Box Thickness", "BoxThickness", 1)
         numInput(s3, "Bone Thickness", "BoneThickness", 1)
         numInput(s3, "Health Thickness", "HealthThickness", 3)
@@ -3954,18 +3982,32 @@ function StartScript(plf)
                             elseif d.T.Visible then d.T.Visible = false end
                         end
                         if d.LT then
-                            local head = ch:FindFirstChild("Head")
-                            if cLookTr and head then
-                                local origin = head.Position
-                                local tipPos = origin + head.CFrame.LookVector * 12
+                            local originPart = cfg.LookTracerOrigin == "Body" and hrp or ch:FindFirstChild("Head")
+                            if cLookTr and originPart then
+                                local origin = originPart.Position
+                                local direction = originPart.CFrame.LookVector
+                                local tipPos = origin + direction * cfg.LookTracerLength
+                                
                                 local p1, on1 = c:WorldToViewportPoint(origin)
                                 local p2, on2 = c:WorldToViewportPoint(tipPos)
-                                if on1 and on2 and p1.Z > 0 and p2.Z > 0 then
+                                
+                                if p1.Z > 0 and p2.Z > 0 then
+                                    local baseTrans = cfg.LookTracerTransparency
+                                    if cfg.LookTracerAnimate then
+                                        baseTrans = baseTrans * (0.5 + 0.5 * math.sin(tick() * 8))
+                                    end
+                                    
                                     if not d.LT.Visible then d.LT.Visible = true end
                                     setLinePoints(d.LT, Vector2.new(p1.X, p1.Y), Vector2.new(p2.X, p2.Y))
-                                    d.LT.Color = cLtCol; d.LT.Thickness = cLtTh
-                                elseif d.LT.Visible then d.LT.Visible = false end
-                            elseif d.LT.Visible then d.LT.Visible = false end
+                                    d.LT.Color = cLtCol
+                                    d.LT.Thickness = cLtTh
+                                    d.LT.Transparency = baseTrans
+                                else
+                                    if d.LT.Visible then d.LT.Visible = false end
+                                end
+                            else
+                                if d.LT.Visible then d.LT.Visible = false end
+                            end
                         end
                         if cBone then
                             local bp = ch:FindFirstChild("UpperTorso") and BONE_PAIRS_R15 or BONE_PAIRS_R6

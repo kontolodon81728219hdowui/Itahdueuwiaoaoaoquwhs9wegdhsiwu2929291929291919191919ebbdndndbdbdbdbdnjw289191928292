@@ -3576,6 +3576,10 @@ function StartScript(plf)
             if l then l.Thickness, l.Color = cfg.BoxThickness, cfg.BoxColor end
             table.insert(d.C_Lines, l)
         end
+        d.charCache = nil
+        d.hrp = nil
+        d.hum = nil
+        d.boneCache = nil
         dr[pl] = d
         for i = 1, BONE_PAIRS_COUNT do
             local l = mkLine()
@@ -3612,6 +3616,7 @@ function StartScript(plf)
         hitChams[pl] = {sq = sq, expiresAt = tick() + 2}
     end
     local function updateChams()
+        if next(hitChams) == nil then return end
         local now = tick(); local hide = root.Visible
         for pl, data in pairs(hitChams) do
             if now > data.expiresAt or hide then
@@ -3721,6 +3726,8 @@ function StartScript(plf)
     end))
 
     local currentAimPos = nil
+    local aimTarget = nil
+    local aimSearchAccum = 0
     local lastAimTick = tick()
     reg(RS:BindToRenderStep(bindName, 202, function()
         local nowTick = tick()
@@ -3746,6 +3753,7 @@ function StartScript(plf)
     local killFeedSig = ""
     local lastKFCount = 0
     local lastCrosshairPos = Vector2.new(-1, -1)
+    local radarFrame = 0
 
     mainLoop = RS.RenderStepped:Connect(function(dt)
         local vs = c.ViewportSize
@@ -3826,8 +3834,8 @@ function StartScript(plf)
                     pcall(function() fT.Radius = cFovSize; fT.Position = Vector2.new(halfX, halfY) end)
                 end
             end
+            fovState.size, fovState.cx, fovState.cy = cFovSize, halfX, halfY
         end
-        fovState.size, fovState.cx, fovState.cy = cFovSize, halfX, halfY
 
         if #crosshairParts > 0 and lastCrosshairPos ~= vs then
             lastCrosshairPos = vs
@@ -3881,14 +3889,29 @@ function StartScript(plf)
             local ch = pl.Character
             local visible = anyESP and ch and v_cached(pl)
             if visible then
-                local hrp = ch:FindFirstChild("HumanoidRootPart")
-                local hum = ch:FindFirstChildOfClass("Humanoid")
-                if hrp and hum then
+                if d.charCache ~= ch then
+                    d.charCache = ch
+                    d.hrp = ch:FindFirstChild("HumanoidRootPart")
+                    d.hum = ch:FindFirstChildOfClass("Humanoid")
+                    d.boneCache = nil
+                end
+                local hrp, hum = d.hrp, d.hum
+                if hrp and hrp.Parent and hum and hum.Parent then
                     local hrpPos = hrp.Position
-                    local ps, on = c:WorldToViewportPoint(hrpPos)
                     local dx, dy, dz = camPos.X - hrpPos.X, camPos.Y - hrpPos.Y, camPos.Z - hrpPos.Z
-                    local dist = math.sqrt(dx*dx + dy*dy + dz*dz)
-                    if on and ps.Z > 0 and dist < 600 then
+                    local distSq = dx*dx + dy*dy + dz*dz
+                    local ps, on, dist
+                    if distSq < 360000 then
+                        ps, on = c:WorldToViewportPoint(hrpPos)
+                        if on and ps.Z > 0 then
+                            dist = math.sqrt(distSq)
+                        else
+                            on = false
+                        end
+                    else
+                        on = false
+                    end
+                    if on then
                         local tS = c:WorldToViewportPoint(hrpPos + V3_HEAD)
                         local bS = c:WorldToViewportPoint(hrpPos - V3_FEET)
                         local ht = math.abs(bS.Y - tS.Y); local wd = ht / 1.6
@@ -4029,9 +4052,19 @@ function StartScript(plf)
                             local bp = ch:FindFirstChild("UpperTorso") and BONE_PAIRS_R15 or BONE_PAIRS_R6
                             local bpCount = #bp
                             local li = 1
+                            if not d.boneCache or d.boneCache.char ~= ch or d.boneCache.count ~= bpCount then
+                                d.boneCache = {char = ch, count = bpCount, parts = {}}
+                                for k = 1, bpCount do
+                                    local pr = bp[k]
+                                    d.boneCache.parts[k] = {
+                                        ch:FindFirstChild(pr[1]),
+                                        ch:FindFirstChild(pr[2])
+                                    }
+                                end
+                            end
                             for k = 1, bpCount do
-                                local pr = bp[k]
-                                local p1, p2 = ch:FindFirstChild(pr[1]), ch:FindFirstChild(pr[2])
+                                local cached = d.boneCache.parts[k]
+                                local p1, p2 = cached[1], cached[2]
                                 if p1 and p2 then
                                     local v1, o1 = c:WorldToViewportPoint(p1.Position)
                                     local v2, o2 = c:WorldToViewportPoint(p2.Position)
@@ -4089,7 +4122,20 @@ function StartScript(plf)
             end
         end
 
+        aimSearchAccum = aimSearchAccum + dt
+        local needSearch = false
         if cAim and not menuOpen then
+            if not aimTarget or not aimTarget.part or not aimTarget.part.Parent then
+                needSearch = true
+            elseif aimSearchAccum >= 0.05 then
+                needSearch = true
+            end
+        else
+            aimTarget = nil
+        end
+
+        if needSearch then
+            aimSearchAccum = 0
             local bestScore, tg, tgPl = math.huge, nil, nil
             local useNearest = cfg.UseNearest
             local targetAll = cfg.TargetAll
@@ -4139,19 +4185,25 @@ function StartScript(plf)
                     end
                 end
             end
-            if tg and tgPl then
-                local aimPos = CalcPred(tgPl, tg)
-                if aimPos then
-                    local rx, ry = 0, 0
-                    if cfg.JitterAim then
-                        rx = (math.random() - 0.5) * 2 * cfg.RandOffsetX
-                        ry = (math.random() - 0.5) * 2 * cfg.RandOffsetY
-                    end
-                    local rv, uv = camCF.RightVector, camCF.UpVector
-                    currentAimPos = aimPos + rv * (cfg.OffsetX + rx) + uv * (cfg.OffsetY + ry)
+            if tg and tgPl then aimTarget = {pl = tgPl, part = tg} else aimTarget = nil end
+        end
+
+        if cAim and not menuOpen and aimTarget and aimTarget.part and aimTarget.part.Parent then
+            local aimPos = CalcPred(aimTarget.pl, aimTarget.part)
+            if aimPos then
+                local rx, ry = 0, 0
+                if cfg.JitterAim then
+                    rx = (math.random() - 0.5) * 2 * cfg.RandOffsetX
+                    ry = (math.random() - 0.5) * 2 * cfg.RandOffsetY
                 end
-            else currentAimPos = nil end
-        else currentAimPos = nil end
+                local rv, uv = camCF.RightVector, camCF.UpVector
+                currentAimPos = aimPos + rv * (cfg.OffsetX + rx) + uv * (cfg.OffsetY + ry)
+            else
+                currentAimPos = nil
+            end
+        else
+            currentAimPos = nil
+        end
 
         if cfg.KillStats then
             local ks = _G.__zeva_killStatsGui
@@ -4215,7 +4267,9 @@ function StartScript(plf)
             _G.__zeva_killFeedGui.sg.Enabled = false
         end
 
-        if cfg.Radar then
+        radarFrame = radarFrame + 1
+        local radarTick = (radarFrame % 2 == 0)
+        if radarTick and cfg.Radar then
             if not _G.__zeva_radarGui or not _G.__zeva_radarGui.sg or not _G.__zeva_radarGui.sg.Parent then
                 local sg = Instance.new("ScreenGui", p.PlayerGui)
                 sg.Name = "zeva_radar_"..tostring(math.random(1e6,9e6)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
@@ -4333,7 +4387,7 @@ function StartScript(plf)
                 if dots[i] and dots[i].container then dots[i].container.Visible = false end
             end
             if not rd.sg.Enabled then rd.sg.Enabled = true end
-        elseif _G.__zeva_radarGui and _G.__zeva_radarGui.sg and _G.__zeva_radarGui.sg.Enabled then
+        elseif radarTick and _G.__zeva_radarGui and _G.__zeva_radarGui.sg and _G.__zeva_radarGui.sg.Enabled then
             _G.__zeva_radarGui.sg.Enabled = false
         end
 

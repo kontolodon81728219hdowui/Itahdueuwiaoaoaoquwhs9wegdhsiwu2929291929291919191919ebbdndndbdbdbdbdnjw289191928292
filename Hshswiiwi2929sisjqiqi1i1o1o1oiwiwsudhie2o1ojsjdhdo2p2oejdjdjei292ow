@@ -1,10 +1,20 @@
 -- ============================================================
--- Zeva v8.5.1 — VIBECODED (ESP Overhaul)
+-- Zeva v8.6.0 — VIBECODED (feature merge)
 -- ============================================================
--- [C] upgrades:
---   - Fixed Health Bar (Line based, no more black boxes)
---   - Added "Middle" to Tracer Origins
---   - Corner Box style, LookTracer fixed, Hit Chams fade
+-- [C] additions on 8.5.1:
+--   - Toast notifications on every toggle / config action
+--   - Sticky Aim (locks target 0.18s after crosshair drifts)
+--   - 3D Box style (12 lines, perspective)
+--   - Box / Name / Tracer glow toggles
+--   - Hit Marker (red X on triggerbot)
+--   - Infinite Jump
+--   - Anti-Aim Random mode
+--   - Hit sound randomization
+--   - cycleRow dropdowns (cleaner UI)
+--   - Radar player names
+--   - clearSelectors catches all zeva_* GUIs
+--   - SpectateDelay shows "0.35s" suffix
+--   - FIXED: aimlock no longer freezes on last position when target lost
 -- ============================================================
 
 -- ============================================================
@@ -73,7 +83,7 @@ do
 end
 
 -- ============================================================
--- Zeva v8.5.1
+-- Zeva v8.6.0
 -- ============================================================
 local P   = game:GetService("Players")
 local RS  = game:GetService("RunService")
@@ -300,6 +310,67 @@ local function setVibe(on)
     end
 end
 
+-- TOAST
+local toastHolder
+local function toast(title, msg, color)
+    if not toastHolder or not toastHolder.Parent then
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "zeva_toast_" .. math.random(1e6, 9e6)
+        sg.ResetOnSpawn = false
+        sg.IgnoreGuiInset = true
+        sg.DisplayOrder = 200
+        sg.Parent = p.PlayerGui
+        local holder = Instance.new("Frame", sg)
+        holder.Size = UDim2.new(0, 300, 1, -40)
+        holder.Position = UDim2.new(1, -320, 0, 20)
+        holder.BackgroundTransparency = 1
+        local lay = Instance.new("UIListLayout", holder)
+        lay.SortOrder, lay.VerticalAlignment, lay.Padding =
+            Enum.SortOrder.LayoutOrder, Enum.VerticalAlignment.Top, UDim.new(0, 8)
+        toastHolder = holder
+    end
+
+    local frame = Instance.new("Frame", toastHolder)
+    frame.Size = UDim2.new(1, 0, 0, 60)
+    frame.BackgroundColor3 = TH.Panel
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Position = UDim2.new(1, 40, 0, 0)
+    round(frame, 10); stroke(frame, color or TH.Accent, 1.5, 0.2)
+
+    local accent = Instance.new("Frame", frame)
+    accent.Size = UDim2.new(0, 3, 1, -16)
+    accent.Position = UDim2.new(0, 0, 0, 8)
+    accent.BackgroundColor3 = color or TH.Accent
+    accent.BorderSizePixel = 0
+    round(accent, 2)
+
+    local t = Instance.new("TextLabel", frame)
+    t.Size = UDim2.new(1, -24, 0, 20)
+    t.Position = UDim2.new(0, 16, 0, 8)
+    t.BackgroundTransparency = 1
+    t.Text = title
+    t.TextColor3 = TH.Text
+    t.Font = FONTB; t.TextSize = 12
+    t.TextXAlignment = Enum.TextXAlignment.Left
+
+    local m = Instance.new("TextLabel", frame)
+    m.Size = UDim2.new(1, -24, 0, 20)
+    m.Position = UDim2.new(0, 16, 0, 28)
+    m.BackgroundTransparency = 1
+    m.Text = msg
+    m.TextColor3 = TH.TextDim
+    m.Font = FONT; m.TextSize = 11
+    m.TextXAlignment = Enum.TextXAlignment.Left
+    m.TextTruncate = Enum.TextTruncate.AtEnd
+
+    tw(frame, EASE.med, {Position = UDim2.new(0, 0, 0, 0)})
+    task.delay(3.2, function()
+        tw(frame, EASE.med, {Position = UDim2.new(1, 40, 0, 0), BackgroundTransparency = 1})
+        task.delay(0.35, function() if frame then frame:Destroy() end end)
+    end)
+end
+
 local function ripple(parent, x, y)
     pcall(function()
         local r = Instance.new("Frame", parent)
@@ -333,9 +404,7 @@ local function keyName(k)
 end
 local function clearSelectors()
     for _, ch in ipairs(p.PlayerGui:GetChildren()) do
-        if ch.Name:find("^zeva_sel_") or ch.Name:find("^zeva_key_") or ch.Name:find("^zeva_scan_") then
-            ch:Destroy()
-        end
+        if ch.Name:find("^zeva_") then ch:Destroy() end
     end
 end
 local currentPlatform = "PC"
@@ -481,7 +550,7 @@ function buildSelector()
         return l
     end
 
-    line("ZEVA / v8.5.1", TERM.Hi, 15, 0, 0)
+    line("ZEVA / v8.6.0", TERM.Hi, 15, 0, 0)
     line("dc:zevadenn   tt:ntosz", TERM.Dim, 11, 22, 0.05)
     line("> mount /dev/zeva ................. ok", TERM.Amber, 12, 50, 0.15)
     line("> loading auth daemon ............. ok", TERM.Amber, 12, 68, 0.25)
@@ -989,8 +1058,12 @@ function StartScript(plf)
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
         BoxStyle="2D", TracerOrigin="Top", ShowHPText=false,
+        BoxGlow=false, NameGlow=false, TracerGlow=false,
+        StickyAim=false, StickyDuration=0.18,
+        InfiniteJump=false, HitMarker=false,
         Radar=false, RadarSize=140, RadarRange=200,
         RadarEnemyColor=Color3.fromRGB(244,106,122), RadarTeamColor=Color3.fromRGB(120,220,165), RadarSelfColor=Color3.fromRGB(150,130,255),
+        RadarShowNames=false,
         AntiAimEnabled=false, AntiAimMode="Static", AntiAimPitch=0, AntiAimYaw=180, AntiAimSpinSpeed=8,
         AutoBhop=false,
         FPSOverlay=false,
@@ -1065,6 +1138,18 @@ function StartScript(plf)
         menuSound.SoundId, menuSound.Volume = "rbxassetid://7738058460", 1
     end)
 
+    -- FEATURE: hit sound randomization
+    local HIT_SOUND_IDS = {
+        Default = { "rbxassetid://2865227271", "rbxassetid://131961136" },
+        Soft    = { "rbxassetid://131961136" },
+        Hard    = { "rbxassetid://911409889", "rbxassetid://2865227271" },
+        Silent  = { "rbxassetid://0" },
+    }
+    local function rollHitSound()
+        local pack = HIT_SOUND_IDS[cfg.SoundPack] or HIT_SOUND_IDS.Default
+        return pack[math.random(1, #pack)]
+    end
+
     local hitChams, lastHealth, crosshairParts = {}, {}, {}
     local killStats = {hits = 0}
     local killFeed = {}
@@ -1072,7 +1157,14 @@ function StartScript(plf)
     local aaJitterPhase = 0
     local aaLastYaw = nil
     local aaOriginalNeckC0 = nil
+    local aaRandomYaw = 0
+    local aaRandomPitch = 0
+    local aaRandomLast = 0
     local lastFrameDt = 1/60
+
+    -- FEATURE: hit marker
+    local hitMarker = { shown = 0 }
+    local hitMarkerParts = {}
 
     -- MAGIC BULLET
     local bhCache = {}
@@ -1230,20 +1322,31 @@ function StartScript(plf)
         if fcControlsDisabled then fcToggleControls(true); fcControlsDisabled = false end
     end
     local function autoHop()
-        if not cfg.AutoBhop then return end
+        if not cfg.AutoBhop and not cfg.InfiniteJump then return end
         local char = p.Character; if not char then return end
         local hum = char:FindFirstChildOfClass("Humanoid")
         if not hum or hum.Health <= 0 then return end
-        if hum.FloorMaterial == AIR then return end
-        local now = tick()
-        if now - lastJumpFire > 0.05 then
-            pcall(function()
-                hum.Jump = true
-                if hum:GetState() ~= Enum.HumanoidStateType.Jumping then
+        if cfg.AutoBhop and hum.FloorMaterial ~= AIR then
+            local now = tick()
+            if now - lastJumpFire > 0.05 then
+                pcall(function()
+                    hum.Jump = true
+                    if hum:GetState() ~= Enum.HumanoidStateType.Jumping then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end)
+                lastJumpFire = now
+            end
+        end
+        if cfg.InfiniteJump and hum:GetState() ~= Enum.HumanoidStateType.Jumping
+           and hum:GetState() ~= Enum.HumanoidStateType.Freefall then
+            local now = tick()
+            if now - lastJumpFire > 0.06 then
+                pcall(function()
                     hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                end
-            end)
-            lastJumpFire = now
+                end)
+                lastJumpFire = now
+            end
         end
     end
     local function applyAntiAim(dt)
@@ -1256,7 +1359,9 @@ function StartScript(plf)
             if not aaOriginalNeckC0 then aaOriginalNeckC0 = neck.C0 end
             local isR15 = char:FindFirstChild("UpperTorso") ~= nil
             local baseY = isR15 and -0.5 or 1.0
-            neck.C0 = CFrame.new(0, baseY, 0) * CFrame.Angles(-math.pi/2 + math.rad(cfg.AntiAimPitch), math.pi, 0)
+            local pitch = cfg.AntiAimPitch
+            if cfg.AntiAimMode == "Random" then pitch = aaRandomPitch end
+            neck.C0 = CFrame.new(0, baseY, 0) * CFrame.Angles(-math.pi/2 + math.rad(pitch), math.pi, 0)
         end
         local yaw
         if cfg.AntiAimMode == "Static" then
@@ -1267,6 +1372,13 @@ function StartScript(plf)
         elseif cfg.AntiAimMode == "Spin" then
             aaYawAccum = (aaYawAccum + cfg.AntiAimSpinSpeed * dt * 60) % 360
             yaw = aaYawAccum
+        elseif cfg.AntiAimMode == "Random" then
+            if tick() - aaRandomLast > 0.08 then
+                aaRandomYaw = math.random(0, 360)
+                aaRandomPitch = math.random(-89, 89)
+                aaRandomLast = tick()
+            end
+            yaw = aaRandomYaw
         else yaw = cfg.AntiAimYaw end
 
         if aaLastYaw and math.abs(yaw - aaLastYaw) < 0.5 then return end
@@ -1418,7 +1530,7 @@ function StartScript(plf)
 
     local subText = Instance.new("TextLabel", title)
     subText.Size, subText.Position, subText.BackgroundTransparency, subText.Text, subText.TextColor3, subText.Font, subText.TextSize =
-        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.5.1", TH.TextMute, FONTL, 11
+        UDim2.new(0,260,1,0), UDim2.new(0, 90, 0, 0), 1, "v8.6.0", TH.TextMute, FONTL, 11
     subText.TextXAlignment = Enum.TextXAlignment.Left
     subText.Visible = isPC
     subText.ZIndex = 5
@@ -1608,6 +1720,7 @@ function StartScript(plf)
     end)
     discordBtn.MouseButton1Click:Connect(function()
         if setclipboard then setclipboard("https://discord.gg/nN9F6kFrmc") end
+        toast("discord", "invite copied", TH.Discord)
     end)
 
     -- PROFILE PANEL
@@ -2098,6 +2211,7 @@ function StartScript(plf)
         hit.MouseButton1Click:Connect(function()
             state = not state; refresh(true)
             if cb then cb(state) end
+            toast(label, state and "enabled" or "disabled", state and TH.On or TH.TextDim)
         end)
         regRefresh(cfgKey, function()
             local newState = cfg[cfgKey] and true or false
@@ -2389,7 +2503,7 @@ function StartScript(plf)
             cfg[cfgKey] = ESP_PRESETS[idx]
             tw(sw, EASE.fast, {BackgroundColor3 = cfg[cfgKey]})
         end)
-        
+
         regRefresh(cfgKey, function()
             for i, col in ipairs(ESP_PRESETS) do
                 if col == cfg[cfgKey] then idx = i; break end
@@ -2399,6 +2513,37 @@ function StartScript(plf)
 
         regFeature(label, BUILD_PAGE, r)
         return sw
+    end
+
+    -- FEATURE: cycleRow helper
+    local function cycleRow(parent, label, cfgKey, options, cb, suffix)
+        suffix = suffix or ""
+        local r = row(parent, 28)
+        local lbl = Instance.new("TextLabel", r)
+        lbl.Size, lbl.BackgroundTransparency, lbl.Text, lbl.TextColor3, lbl.Font, lbl.TextSize =
+            UDim2.new(0.4,0,1,0), 1, label, TH.Text, FONT, 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.ZIndex = 8
+        local idx = 1
+        for i, vv in ipairs(options) do if vv == cfg[cfgKey] then idx = i; break end end
+        local b = Instance.new("TextButton", r)
+        b.Size, b.Position, b.BackgroundColor3, b.Text, b.TextColor3, b.Font, b.TextSize =
+            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, tostring(cfg[cfgKey]) .. suffix, TH.Accent, FONTB, 11
+        b.AutoButtonColor, b.BorderSizePixel = false, 0
+        b.ClipsDescendants = true
+        b.ZIndex = 8
+        round(b, 8); stroke(b, TH.LineHi, 1, 0.4); regAccent(b, "TextColor3")
+        b.MouseEnter:Connect(function() tw(b, EASE.fast, {BackgroundColor3 = TH.Panel3}) end)
+        b.MouseLeave:Connect(function() tw(b, EASE.fast, {BackgroundColor3 = TH.Panel2}) end)
+        b.MouseButton1Click:Connect(function()
+            idx = idx % #options + 1
+            cfg[cfgKey] = options[idx]
+            b.Text = tostring(cfg[cfgKey]) .. suffix
+            if cb then cb(cfg[cfgKey]) end
+        end)
+        regRefresh(cfgKey, function() b.Text = tostring(cfg[cfgKey]) .. suffix end)
+        regFeature(label, BUILD_PAGE, r)
+        return b
     end
 
     do
@@ -2509,6 +2654,8 @@ function StartScript(plf)
                 false, true)
             toggle(s, "Aim: Toggle Mode", "AimToggleMode", false, function(v) cfg.AimToggleMode = v end)
         end
+        toggle(s, "Sticky Aim", "StickyAim", false, function(v) cfg.StickyAim = v end)
+        slider(s, "Sticky Duration", "StickyDuration", 0.05, 0.5, 0.18, function(v) cfg.StickyDuration = v end, 2)
         toggle(s, "Magic Bullet", "BigHead", false, function(v)
             cfg.BigHead = v
             if not v then BH_restoreAll() end
@@ -2523,6 +2670,7 @@ function StartScript(plf)
         slider(s, "Bullet Size", "BigHeadSizeNum", 5, 50, 20, function(v) cfg.BigHeadSizeNum = v end)
         toggle(s, "Wallcheck", "WallCheck", false, function(v) cfg.WallCheck = v end)
         toggle(s, "Triggerbot", "Trig", false, function(v) cfg.Trig = v end)
+        toggle(s, "Hit Marker", "HitMarker", false, function(v) cfg.HitMarker = v end)
         toggle(s, "Hit Sound", "HitSound", false, function(v) cfg.HitSound = v end)
         toggle(s, "Jitter Aim", "JitterAim", true, function(v) cfg.JitterAim = v end)
         toggle(s, "Auto Predict", "AutoPred", true, function(v) cfg.AutoPred = v end)
@@ -2530,105 +2678,15 @@ function StartScript(plf)
         slider(s2, "Offset X", "OffsetX", -5, 5, 0, function(v) cfg.OffsetX = v end, 2)
         slider(s2, "Offset Y", "OffsetY", -5, 5, 0, function(v) cfg.OffsetY = v end, 2)
         local s3 = section(pages["aim"], "priority")
-        local prRow = Instance.new("Frame", s3)
-        prRow.Size, prRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        prRow.ZIndex = 7
-        local prLbl = Instance.new("TextLabel", prRow)
-        prLbl.Size, prLbl.BackgroundTransparency, prLbl.Text, prLbl.TextColor3, prLbl.Font, prLbl.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Priority", TH.Text, FONT, 12
-        prLbl.TextXAlignment = Enum.TextXAlignment.Left
-        prLbl.ZIndex = 8
-        local prOpts = {"Crosshair", "Closest", "LowestHP", "Visible"}
-        local prIdx = 1
-        for i, vv in ipairs(prOpts) do if vv == cfg.AimPriority then prIdx = i end end
-        local prBtn = Instance.new("TextButton", prRow)
-        prBtn.Size, prBtn.Position, prBtn.BackgroundColor3, prBtn.Text, prBtn.TextColor3, prBtn.Font, prBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.AimPriority, TH.Accent, FONTB, 11
-        prBtn.AutoButtonColor, prBtn.BorderSizePixel = false, 0
-        prBtn.ClipsDescendants = true
-        prBtn.ZIndex = 8
-        round(prBtn, 8); stroke(prBtn, TH.LineHi, 1, 0.4); regAccent(prBtn, "TextColor3")
-        prBtn.MouseEnter:Connect(function() tw(prBtn, EASE.fast, {BackgroundColor3 = TH.Panel3}) end)
-        prBtn.MouseLeave:Connect(function() tw(prBtn, EASE.fast, {BackgroundColor3 = TH.Panel2}) end)
-        prBtn.MouseButton1Click:Connect(function()
-            prIdx = prIdx % #prOpts + 1
-            cfg.AimPriority = prOpts[prIdx]
-            prBtn.Text = cfg.AimPriority
-        end)
-        regFeature("Aim Priority", "aim", prRow)
+        cycleRow(s3, "Priority", "AimPriority", {"Crosshair", "Closest", "LowestHP", "Visible"})
         local s4 = section(pages["aim"], "smoothing")
-        local scRow = Instance.new("Frame", s4)
-        scRow.Size, scRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        scRow.ZIndex = 7
-        local scLbl = Instance.new("TextLabel", scRow)
-        scLbl.Size, scLbl.BackgroundTransparency, scLbl.Text, scLbl.TextColor3, scLbl.Font, scLbl.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Curve", TH.Text, FONT, 12
-        scLbl.TextXAlignment = Enum.TextXAlignment.Left
-        scLbl.ZIndex = 8
-        local scOpts = {"Linear", "Exponential", "Bezier"}
-        local scIdx = 1
-        for i, vv in ipairs(scOpts) do if vv == cfg.SmoothCurve then scIdx = i end end
-        local scBtn = Instance.new("TextButton", scRow)
-        scBtn.Size, scBtn.Position, scBtn.BackgroundColor3, scBtn.Text, scBtn.TextColor3, scBtn.Font, scBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.SmoothCurve, TH.Accent, FONTB, 11
-        scBtn.AutoButtonColor, scBtn.BorderSizePixel = false, 0
-        scBtn.ClipsDescendants = true
-        scBtn.ZIndex = 8
-        round(scBtn, 8); stroke(scBtn, TH.LineHi, 1, 0.4); regAccent(scBtn, "TextColor3")
-        scBtn.MouseButton1Click:Connect(function()
-            scIdx = scIdx % #scOpts + 1
-            cfg.SmoothCurve = scOpts[scIdx]
-            scBtn.Text = cfg.SmoothCurve
-        end)
-        regFeature("Smooth Curve", "aim", scRow)
+        cycleRow(s4, "Curve", "SmoothCurve", {"Linear", "Exponential", "Bezier"})
         local s5 = section(pages["aim"], "fov shape")
-        local shRow = Instance.new("Frame", s5)
-        shRow.Size, shRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        shRow.ZIndex = 7
-        local shLbl = Instance.new("TextLabel", shRow)
-        shLbl.Size, shLbl.BackgroundTransparency, shLbl.Text, shLbl.TextColor3, shLbl.Font, shLbl.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Shape", TH.Text, FONT, 12
-        shLbl.TextXAlignment = Enum.TextXAlignment.Left
-        shLbl.ZIndex = 8
-        local shapes = {"Circle", "Square", "Triangle"}
-        local shapeIdx = 1
-        for i, vv in ipairs(shapes) do if vv == cfg.FovShape then shapeIdx = i end end
-        local shBtn = Instance.new("TextButton", shRow)
-        shBtn.Size, shBtn.Position, shBtn.BackgroundColor3, shBtn.Text, shBtn.TextColor3, shBtn.Font, shBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.FovShape, TH.Accent, FONTB, 11
-        shBtn.AutoButtonColor, shBtn.BorderSizePixel = false, 0
-        shBtn.ClipsDescendants = true
-        shBtn.ZIndex = 8
-        round(shBtn, 8); stroke(shBtn, TH.LineHi, 1, 0.4); regAccent(shBtn, "TextColor3")
-        shBtn.MouseButton1Click:Connect(function() shapeIdx = shapeIdx % #shapes + 1; cfg.FovShape = shapes[shapeIdx]; shBtn.Text = cfg.FovShape end)
-        regFeature("FOV Shape", "aim", shRow)
+        cycleRow(s5, "Shape", "FovShape", {"Circle", "Square", "Triangle"})
 
         local s6 = section(pages["aim"], "aimviewer")
         toggle(s6, "Pause Aimlock On Spectate", "SpectateDetect", true, function(v) cfg.SpectateDetect = v end)
-        local svDelay = Instance.new("Frame", s6)
-        svDelay.Size, svDelay.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        svDelay.ZIndex = 7
-        local svL = Instance.new("TextLabel", svDelay)
-        svL.Size, svL.BackgroundTransparency, svL.Text, svL.TextColor3, svL.Font, svL.TextSize =
-            UDim2.new(0.6,0,1,0), 1, "Detector Poll", TH.Text, FONT, 12
-        svL.TextXAlignment = Enum.TextXAlignment.Left
-        svL.ZIndex = 8
-        local svB = Instance.new("TextButton", svDelay)
-        svB.Size, svB.Position, svB.BackgroundColor3, svB.Text, svB.TextColor3, svB.Font, svB.TextSize =
-            UDim2.new(0.4,-10,1,0), UDim2.new(0.6,0,0,0), TH.Panel2,
-            tostring(cfg.SpectateDelay) .. "s", TH.Accent, FONTB, 11
-        svB.AutoButtonColor, svB.BorderSizePixel = false, 0
-        svB.ZIndex = 8
-        round(svB, 8); stroke(svB, TH.LineHi, 1, 0.4); regAccent(svB, "TextColor3")
-        local svOpts = {0.2, 0.35, 0.5, 0.75, 1.0}
-        local svIdx = 2
-        for i, vv in ipairs(svOpts) do if vv == cfg.SpectateDelay then svIdx = i end end
-        svB.MouseButton1Click:Connect(function()
-            svIdx = svIdx % #svOpts + 1
-            cfg.SpectateDelay = svOpts[svIdx]
-            svB.Text = tostring(cfg.SpectateDelay) .. "s"
-        end)
-        regFeature("Detector Poll", "aim", svDelay)
+        cycleRow(s6, "Detector Poll", "SpectateDelay", {0.2, 0.35, 0.5, 0.75, 1.0}, nil, "s")
     end
 
     -- ESP PAGE
@@ -2636,105 +2694,39 @@ function StartScript(plf)
         BUILD_PAGE = "esp"
         local s = section(pages["esp"], "visuals")
         toggle(s, "Box", "Box", false, function(v) cfg.Box = v end)
-        
-        local boxStyleRow = Instance.new("Frame", s)
-        boxStyleRow.Size, boxStyleRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        boxStyleRow.ZIndex = 7
-        local bsl = Instance.new("TextLabel", boxStyleRow)
-        bsl.Size, bsl.BackgroundTransparency, bsl.Text, bsl.TextColor3, bsl.Font, bsl.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Box Style", TH.Text, FONT, 12
-        bsl.TextXAlignment = Enum.TextXAlignment.Left
-        bsl.ZIndex = 8
-        local bsOpts = {"2D", "Corner"}
-        local bsIdx = 1
-        for i, vv in ipairs(bsOpts) do if vv == cfg.BoxStyle then bsIdx = i end end
-        local bsBtn = Instance.new("TextButton", boxStyleRow)
-        bsBtn.Size, bsBtn.Position, bsBtn.BackgroundColor3, bsBtn.Text, bsBtn.TextColor3, bsBtn.Font, bsBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.BoxStyle, TH.Accent, FONTB, 11
-        bsBtn.AutoButtonColor, bsBtn.BorderSizePixel = false, 0
-        bsBtn.ZIndex = 8
-        round(bsBtn, 8); stroke(bsBtn, TH.LineHi, 1, 0.4); regAccent(bsBtn, "TextColor3")
-        bsBtn.MouseButton1Click:Connect(function()
-            bsIdx = bsIdx % #bsOpts + 1
-            cfg.BoxStyle = bsOpts[bsIdx]
-            bsBtn.Text = cfg.BoxStyle
-        end)
-        regFeature("Box Style", BUILD_PAGE, boxStyleRow)
-
+        cycleRow(s, "Box Style", "BoxStyle", {"2D", "Corner", "3D"})
+        toggle(s, "Box Glow", "BoxGlow", false, function(v) cfg.BoxGlow = v end)
         toggle(s, "Filled Box", "BoxFilled", false, function(v) cfg.BoxFilled = v end)
         toggle(s, "Bones", "Bone", false, function(v) cfg.Bone = v end)
         toggle(s, "Health Bar", "Health", false, function(v) cfg.Health = v end)
         toggle(s, "HP Text", "ShowHPText", false, function(v) cfg.ShowHPText = v end)
         toggle(s, "Distance", "Dist", false, function(v) cfg.Dist = v end)
         toggle(s, "Name ESP", "NameESP", false, function(v) cfg.NameESP = v end)
+        toggle(s, "Name Glow", "NameGlow", false, function(v) cfg.NameGlow = v end)
         toggle(s, "Hit Chams", "Chams", false, function(v) cfg.Chams = v end)
         toggle(s, "Tracer", "Tracer", false, function(v) cfg.Tracer = v end)
-        
-        local tracerOrgRow = Instance.new("Frame", s)
-        tracerOrgRow.Size, tracerOrgRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        tracerOrgRow.ZIndex = 7
-        local tol = Instance.new("TextLabel", tracerOrgRow)
-        tol.Size, tol.BackgroundTransparency, tol.Text, tol.TextColor3, tol.Font, tol.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Tracer Origin", TH.Text, FONT, 12
-        tol.TextXAlignment = Enum.TextXAlignment.Left
-        tol.ZIndex = 8
-        local toOpts = {"Top", "Bottom", "Middle"}
-        local toIdx = 1
-        for i, vv in ipairs(toOpts) do if vv == cfg.TracerOrigin then toIdx = i end end
-        local toBtn = Instance.new("TextButton", tracerOrgRow)
-        toBtn.Size, toBtn.Position, toBtn.BackgroundColor3, toBtn.Text, toBtn.TextColor3, toBtn.Font, toBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.TracerOrigin, TH.Accent, FONTB, 11
-        toBtn.AutoButtonColor, toBtn.BorderSizePixel = false, 0
-        toBtn.ZIndex = 8
-        round(toBtn, 8); stroke(toBtn, TH.LineHi, 1, 0.4); regAccent(toBtn, "TextColor3")
-        toBtn.MouseButton1Click:Connect(function()
-            toIdx = toIdx % #toOpts + 1
-            cfg.TracerOrigin = toOpts[toIdx]
-            toBtn.Text = cfg.TracerOrigin
-        end)
-        regFeature("Tracer Origin", BUILD_PAGE, tracerOrgRow)
-
+        toggle(s, "Tracer Glow", "TracerGlow", false, function(v) cfg.TracerGlow = v end)
+        cycleRow(s, "Tracer Origin", "TracerOrigin", {"Top", "Middle", "Bottom"})
         toggle(s, "Look Tracer", "LookTracer", false, function(v) cfg.LookTracer = v end)
+        cycleRow(s, "LookTracer Origin", "LookTracerOrigin", {"Head", "Body"})
+
         local s2 = section(pages["esp"], "filters")
         toggle(s2, "Team Check", "TeamCheck", false, function(v) cfg.TeamCheck = v end)
         toggle(s2, "Show FOV", "ShowFov", false, function(v) cfg.ShowFov = v end)
+
         local s3 = section(pages["esp"], "customization")
         colorRow(s3, "Box Color", "BoxColor")
         colorRow(s3, "Fill Color", "BoxFilledColor")
         slider(s3, "Fill Trans", "BoxFilledTransparency", 0, 1, 0.5, function(v) cfg.BoxFilledTransparency = v end, 2)
         colorRow(s3, "Bone Color", "BoneColor")
-        colorRow(s3, "Health Color", "HealthColor"); colorRow(s3, "Distance Color", "DistanceColor")
-        colorRow(s3, "Name Color", "NameColor"); colorRow(s3, "Tracer Color", "TracerColor")
-        
+        colorRow(s3, "Health Color", "HealthColor")
+        colorRow(s3, "Distance Color", "DistanceColor")
+        colorRow(s3, "Name Color", "NameColor")
+        colorRow(s3, "Tracer Color", "TracerColor")
         colorRow(s3, "LookTracer Color", "LookTracerColor")
         numInput(s3, "LookTracer Length", "LookTracerLength", 15)
         slider(s3, "LookTracer Transparency", "LookTracerTransparency", 0, 1, 1, function(v) cfg.LookTracerTransparency = v end, 2)
         toggle(s3, "Animate LookTracer", "LookTracerAnimate", false, function(v) cfg.LookTracerAnimate = v end)
-
-        local ltOrgRow = Instance.new("Frame", s3)
-        ltOrgRow.Size, ltOrgRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        ltOrgRow.ZIndex = 7
-        local orgLbl = Instance.new("TextLabel", ltOrgRow)
-        orgLbl.Size, orgLbl.BackgroundTransparency, orgLbl.Text, orgLbl.TextColor3, orgLbl.Font, orgLbl.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "LookTracer Origin", TH.Text, FONT, 12
-        orgLbl.TextXAlignment = Enum.TextXAlignment.Left
-        orgLbl.ZIndex = 8
-        local orgOpts = {"Head", "Body"}
-        local orgIdx = 1
-        for i, vv in ipairs(orgOpts) do if vv == cfg.LookTracerOrigin then orgIdx = i end end
-        local orgBtn = Instance.new("TextButton", ltOrgRow)
-        orgBtn.Size, orgBtn.Position, orgBtn.BackgroundColor3, orgBtn.Text, orgBtn.TextColor3, orgBtn.Font, orgBtn.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.LookTracerOrigin, TH.Accent, FONTB, 11
-        orgBtn.AutoButtonColor, orgBtn.BorderSizePixel = false, 0
-        orgBtn.ZIndex = 8
-        round(orgBtn, 8); stroke(orgBtn, TH.LineHi, 1, 0.4); regAccent(orgBtn, "TextColor3")
-        orgBtn.MouseButton1Click:Connect(function()
-            orgIdx = orgIdx % #orgOpts + 1
-            cfg.LookTracerOrigin = orgOpts[orgIdx]
-            orgBtn.Text = cfg.LookTracerOrigin
-        end)
-        regFeature("LookTracer Origin", BUILD_PAGE, ltOrgRow)
-
         numInput(s3, "Box Thickness", "BoxThickness", 1)
         numInput(s3, "Bone Thickness", "BoneThickness", 1)
         numInput(s3, "Health Thickness", "HealthThickness", 3)
@@ -2748,6 +2740,7 @@ function StartScript(plf)
         BUILD_PAGE = "radar"
         local s = section(pages["radar"], "radar settings")
         toggle(s, "Radar / Minimap", "Radar", false, function(v) cfg.Radar = v end)
+        toggle(s, "Show Names", "RadarShowNames", false, function(v) cfg.RadarShowNames = v end)
         colorRow(s, "Enemy Color", "RadarEnemyColor")
         colorRow(s, "Team Color", "RadarTeamColor")
         colorRow(s, "Self Color", "RadarSelfColor")
@@ -2761,34 +2754,17 @@ function StartScript(plf)
         local s = section(pages["move"], "movement")
         toggle(s, "Spinbot", "Spin", false, function(v) cfg.Spin = v end)
         toggle(s, "Noclip", "Noclip", false, function(v) cfg.Noclip = v end)
+        toggle(s, "Infinite Jump", "InfiniteJump", false, function(v) cfg.InfiniteJump = v end)
         slider(s, "Spin Speed", "SpinSpeed", 0, 360, 50, function(v) cfg.SpinSpeed = v end)
         local wh = section(pages["move"], "auto bhop")
         toggle(wh, "Auto Bhop", "AutoBhop", false, function(v) cfg.AutoBhop = v end)
         local aa = section(pages["move"], "anti-aim")
         toggle(aa, "Anti-Aim", "AntiAimEnabled", false, function(v) cfg.AntiAimEnabled = v; if not v then restoreAntiAim() end end)
-        local aaMR = Instance.new("Frame", aa)
-        aaMR.Size, aaMR.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        aaMR.ZIndex = 7
-        local aaL = Instance.new("TextLabel", aaMR)
-        aaL.Size, aaL.BackgroundTransparency, aaL.Text, aaL.TextColor3, aaL.Font, aaL.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Mode", TH.Text, FONT, 12
-        aaL.TextXAlignment = Enum.TextXAlignment.Left
-        aaL.ZIndex = 8
-        local aaOpts = {"Static", "Jitter", "Spin"}
-        local aaIdx = 1
-        for i, vv in ipairs(aaOpts) do if vv == cfg.AntiAimMode then aaIdx = i end end
-        local aaB = Instance.new("TextButton", aaMR)
-        aaB.Size, aaB.Position, aaB.BackgroundColor3, aaB.Text, aaB.TextColor3, aaB.Font, aaB.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.AntiAimMode, TH.Accent, FONTB, 11
-        aaB.AutoButtonColor, aaB.BorderSizePixel = false, 0
-        aaB.ZIndex = 8
-        round(aaB, 8); stroke(aaB, TH.LineHi, 1, 0.4); regAccent(aaB, "TextColor3")
-        aaB.MouseButton1Click:Connect(function() aaIdx = aaIdx % #aaOpts + 1; cfg.AntiAimMode = aaOpts[aaIdx]; aaB.Text = cfg.AntiAimMode; aaYawAccum = 0 end)
-        regFeature("Anti-Aim Mode", BUILD_PAGE, aaMR)
+        cycleRow(aa, "Mode", "AntiAimMode", {"Static", "Jitter", "Spin", "Random"})
         slider(aa, "AA Pitch", "AntiAimPitch", -89, 89, 0, function(v) cfg.AntiAimPitch = v end)
         slider(aa, "AA Yaw", "AntiAimYaw", 0, 360, 180, function(v) cfg.AntiAimYaw = v end)
         slider(aa, "AA Spin Speed", "AntiAimSpinSpeed", 0, 45, 8, function(v) cfg.AntiAimSpinSpeed = v end)
-        
+
         local fc = section(pages["move"], "free cam")
         toggle(fc, "Free Cam", "FreeCam", false, function(v) cfg.FreeCam = v; if v then fcStart() else fcStop() end end)
         slider(fc, "Free Cam Speed", "FreeCamSpeed", 20, 200, 60, function(v) cfg.FreeCamSpeed = v end)
@@ -2960,11 +2936,13 @@ function StartScript(plf)
             local ok = pcall(function() writefile("zeva_config.json", HS:JSONEncode(data)) end)
             if btn then
                 btn.Text = ok and "saved." or "save failed."
+                toast("config", ok and "saved to disk" or "save failed", ok and TH.On or TH.Danger)
                 task.delay(1.5, function() if btn and btn.Parent then btn.Text = "Save Config" end end)
             end
         end)
         button(s, "Load Config", function()
-            pcall(function() local raw = readfile("zeva_config.json"); applyConfigData(HS:JSONDecode(raw)) end)
+            local ok = pcall(function() local raw = readfile("zeva_config.json"); applyConfigData(HS:JSONDecode(raw)) end)
+            toast("config", ok and "loaded from disk" or "load failed", ok and TH.On or TH.Danger)
         end)
         button(s, "Reset to Default", function()
             for k, v in pairs(CFG_DEFAULTS) do
@@ -2997,6 +2975,7 @@ function StartScript(plf)
             ppIdLabel.Text = cfg.HideInfo and "(anonymous)" or ("id   "..tostring(p.UserId))
             markSelectedPartsDirty()
             refreshAllFromCfg()
+            toast("config", "reset to defaults", TH.Accent)
         end)
         _G.__zeva_applyConfigData = applyConfigData
 
@@ -3045,52 +3024,11 @@ function StartScript(plf)
         end
         local s4 = section(pages["settings"], "audio")
         toggle(s4, "Menu Sound", "MenuSound", true, function(v) cfg.MenuSound = v end)
-        local spRow = Instance.new("Frame", s4)
-        spRow.Size, spRow.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        spRow.ZIndex = 7
-        local spL = Instance.new("TextLabel", spRow)
-        spL.Size, spL.BackgroundTransparency, spL.Text, spL.TextColor3, spL.Font, spL.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Hit Sound Pack", TH.Text, FONT, 12
-        spL.TextXAlignment = Enum.TextXAlignment.Left
-        spL.ZIndex = 8
-        local spOpts = {"Default", "Soft", "Hard", "Silent"}
-        local spIdx = 1
-        for i, vv in ipairs(spOpts) do if vv == cfg.SoundPack then spIdx = i end end
-        local spB = Instance.new("TextButton", spRow)
-        spB.Size, spB.Position, spB.BackgroundColor3, spB.Text, spB.TextColor3, spB.Font, spB.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.SoundPack, TH.Accent, FONTB, 11
-        spB.AutoButtonColor, spB.BorderSizePixel = false, 0
-        spB.ZIndex = 8
-        round(spB, 8); stroke(spB, TH.LineHi, 1, 0.4); regAccent(spB, "TextColor3")
-        local sIds = {Default="rbxassetid://2865227271", Soft="rbxassetid://131961136", Hard="rbxassetid://911409889", Silent="rbxassetid://0"}
-        spB.MouseButton1Click:Connect(function()
-            spIdx = spIdx % #spOpts + 1; cfg.SoundPack = spOpts[spIdx]; spB.Text = cfg.SoundPack
-            if hitSound then pcall(function() hitSound.SoundId = sIds[cfg.SoundPack] or "rbxassetid://0" end) end
-        end)
-        regFeature("Sound Pack", "settings", spRow)
+        cycleRow(s4, "Hit Sound Pack", "SoundPack", {"Default", "Soft", "Hard", "Silent"})
 
         local s5 = section(pages["settings"], "crosshair")
         toggle(s5, "Custom Crosshair", "Crosshair", false, function(v) cfg.Crosshair = v; buildCrosshair() end)
-        local xhR = Instance.new("Frame", s5)
-        xhR.Size, xhR.BackgroundTransparency = UDim2.new(1,0,0,28), 1
-        xhR.ZIndex = 7
-        local xhL = Instance.new("TextLabel", xhR)
-        xhL.Size, xhL.BackgroundTransparency, xhL.Text, xhL.TextColor3, xhL.Font, xhL.TextSize =
-            UDim2.new(0.4,0,1,0), 1, "Style", TH.Text, FONT, 12
-        xhL.TextXAlignment = Enum.TextXAlignment.Left
-        xhL.ZIndex = 8
-        local xhStyles = {"Cross", "Dot", "Circle", "T"}
-        local xhIdx = 1
-        for i, vv in ipairs(xhStyles) do if vv == cfg.CrosshairStyle then xhIdx = i end end
-        local xhB = Instance.new("TextButton", xhR)
-        xhB.Size, xhB.Position, xhB.BackgroundColor3, xhB.Text, xhB.TextColor3, xhB.Font, xhB.TextSize =
-            UDim2.new(0.6,-10,1,0), UDim2.new(0.4,0,0,0), TH.Panel2, cfg.CrosshairStyle, TH.Accent, FONTB, 11
-        xhB.AutoButtonColor, xhB.BorderSizePixel = false, 0
-        xhB.ZIndex = 8
-        round(xhB, 8); stroke(xhB, TH.LineHi, 1, 0.4); regAccent(xhB, "TextColor3")
-        xhB.MouseButton1Click:Connect(function()
-            xhIdx = xhIdx % #xhStyles + 1; cfg.CrosshairStyle = xhStyles[xhIdx]; xhB.Text = cfg.CrosshairStyle; buildCrosshair()
-        end)
+        cycleRow(s5, "Style", "CrosshairStyle", {"Cross", "Dot", "Circle", "T"})
         colorRow(s5, "Crosshair Color", "CrosshairColor")
         numInput(s5, "Size", "CrosshairSize", 12, function() buildCrosshair() end)
         numInput(s5, "Gap", "CrosshairGap", 4, function() buildCrosshair() end)
@@ -3101,7 +3039,7 @@ function StartScript(plf)
         toggle(s6, "Kill Feed", "KillFeed", false, function(v) cfg.KillFeed = v end)
         toggle(s6, "FPS / Ping Overlay", "FPSOverlay", false, function(v) cfg.FPSOverlay = v end)
 
-        -- DANGER ZONE (premium card-style)
+        -- DANGER ZONE
         local s8 = section(pages["settings"], "danger zone")
 
         local dz1 = Instance.new("TextButton", s8)
@@ -3210,10 +3148,12 @@ function StartScript(plf)
             pcall(function() fC:Remove() end); pcall(function() fS:Remove() end); pcall(function() fT:Remove() end)
             for _, d in pairs(hitChams) do pcall(function() d.sq:Remove() end) end
             for _, o in ipairs(crosshairParts) do pcall(function() o:Remove() end) end
+            for _, o in ipairs(hitMarkerParts) do pcall(function() o:Remove() end) end
             if _G.__zeva_killStatsGui then pcall(function() _G.__zeva_killStatsGui.sg:Destroy() end); _G.__zeva_killStatsGui = nil end
             if _G.__zeva_killFeedGui then pcall(function() _G.__zeva_killFeedGui.sg:Destroy() end); _G.__zeva_killFeedGui = nil end
             if _G.__zeva_radarGui then pcall(function() _G.__zeva_radarGui.sg:Destroy() end); _G.__zeva_radarGui = nil end
             if _G.__zeva_fpsGui then pcall(function() _G.__zeva_fpsGui.sg:Destroy() end); _G.__zeva_fpsGui = nil end
+            if toastHolder and toastHolder.Parent then pcall(function() toastHolder.Parent:Destroy() end) end
             pcall(function() g:Destroy() end)
             pcall(function() blur:Destroy() end)
             pcall(function() bloom:Destroy() end)
@@ -3251,7 +3191,10 @@ function StartScript(plf)
             elseif f.name:find(q, 1, true) then s = 100 + (50 - math.min(50, #f.name - #q)) end
             if s > bs then bs = s; best = f end
         end
-        if not best then return end
+        if not best then
+            toast("search", "no match for '" .. q .. "'", TH.Danger)
+            return
+        end
         setTab(best.tab)
         task.spawn(function()
             task.wait(0.12)
@@ -3607,16 +3550,18 @@ function StartScript(plf)
     reg(p.CharacterAdded:Connect(function() task.wait(0.15); rebuildNoclipParts() end))
     task.spawn(function() task.wait(0.15); rebuildNoclipParts() end)
 
-    -- ESP HANDLES
+    -- ESP HANDLES — 12 corner lines for 3D box + glow handles
     local dr = {}
     local function ce(pl)
         if pl == p or dr[pl] then return end
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
-        local d = { 
-            L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), HPText=mkText(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(),
-            C_Lines = {}, -- 8 lines for corner box
+        local d = {
+            L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), HPText=mkText(),
+            D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(),
+            C_Lines = {},
+            GlowBox = mkSquare(), GlowName = mkText(), GlowTracer = mkLine(),
         }
         if d.B then d.B.Thickness, d.B.Color, d.B.Filled = cfg.BoxThickness, cfg.BoxColor, false end
         if d.BF then d.BF.Thickness, d.BF.Color, d.BF.Filled, d.BF.Transparency = 0, cfg.BoxFilledColor, true, cfg.BoxFilledTransparency end
@@ -3626,12 +3571,22 @@ function StartScript(plf)
         if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
-        if d.Name then 
+        if d.Name then
             d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor
             d.Name.Outline = true
-            d.Name.OutlineColor = Color3.new(0,0,0) 
+            d.Name.OutlineColor = Color3.new(0,0,0)
         end
-        for i = 1, 8 do
+        if d.GlowBox then d.GlowBox.Thickness, d.GlowBox.Color, d.GlowBox.Filled, d.GlowBox.Transparency = 6, cfg.BoxColor, false, 0.7 end
+        if d.GlowName then
+            d.GlowName.Size = cfg.NameSize + 2
+            d.GlowName.Center = true
+            d.GlowName.Color = cfg.NameColor
+            d.GlowName.Outline = true
+            d.GlowName.OutlineColor = cfg.NameColor
+            d.GlowName.Transparency = 0.5
+        end
+        if d.GlowTracer then d.GlowTracer.Thickness, d.GlowTracer.Color, d.GlowTracer.Transparency = cfg.TracerThickness + 3, cfg.TracerColor, 0.6 end
+        for i = 1, 12 do
             local l = mkLine()
             if l then l.Thickness, l.Color = cfg.BoxThickness, cfg.BoxColor end
             table.insert(d.C_Lines, l)
@@ -3726,6 +3681,42 @@ function StartScript(plf)
     end
     buildCrosshair()
 
+    -- Hit marker
+    local function buildHitMarker()
+        for _, o in ipairs(hitMarkerParts) do pcall(function() o:Remove() end) end
+        hitMarkerParts = {}
+    end
+    buildHitMarker()
+    local function flashHitMarker()
+        hitMarker.shown = tick()
+        local vs = c.ViewportSize
+        local cx, cy = vs.X * 0.5, vs.Y * 0.5
+        for _, o in ipairs(hitMarkerParts) do pcall(function() o:Remove() end) end
+        hitMarkerParts = {}
+        local function line(x1,y1,x2,y2)
+            local l; pcall(function() l = Drawing.new("Line") end); if not l then return end
+            setLinePoints(l, Vector2.new(cx+x1,cy+y1), Vector2.new(cx+x2,cy+y2))
+            l.Color = Color3.fromRGB(255, 80, 80)
+            l.Thickness = 2; l.Transparency = 1; l.Visible = true
+            table.insert(hitMarkerParts, l)
+        end
+        line(-8,-8,8,8); line(8,-8,-8,8)
+    end
+    local function fadeHitMarker()
+        if hitMarker.shown == 0 then return end
+        local age = tick() - hitMarker.shown
+        if age > 0.35 then
+            for _, o in ipairs(hitMarkerParts) do pcall(function() o:Remove() end) end
+            hitMarkerParts = {}
+            hitMarker.shown = 0
+            return
+        end
+        local alpha = math.clamp(1 - age / 0.35, 0, 1)
+        for _, o in ipairs(hitMarkerParts) do
+            pcall(function() o.Transparency = alpha end)
+        end
+    end
+
     local function scoreTarget(pl, part, camPos, scx, scy)
         if cfg.AimPriority == "Closest" then return (part.Position - camPos).Magnitude end
         if cfg.AimPriority == "LowestHP" then
@@ -3782,6 +3773,8 @@ function StartScript(plf)
 
     local currentAimPos = nil
     local lastAimTick = tick()
+    local lastStickyTarget = nil
+    local lastStickyTime = 0
     reg(RS:BindToRenderStep(bindName, 202, function()
         local nowTick = tick()
         local dt = math.clamp(nowTick - lastAimTick, 0, 0.1)
@@ -3832,6 +3825,8 @@ function StartScript(plf)
         local cNameCol, cNameSz = cfg.NameColor, cfg.NameSize
         local cTrCol, cTrTh = cfg.TracerColor, cfg.TracerThickness
         local cLtCol, cLtTh = cfg.LookTracerColor, cfg.LookTracerThickness
+
+        fadeHitMarker()
 
         if cfg.FPSOverlay then
             fpsFrames = fpsFrames + 1
@@ -3954,7 +3949,7 @@ function StartScript(plf)
                         local ht = math.abs(bS.Y - tS.Y); local wd = ht / 1.6
                         local tSy = tS.Y
                         local psx, psy = ps.X, ps.Y
-                        
+
                         -- Box Styles
                         if d.B then
                             if cBox and cfg.BoxStyle == "2D" then
@@ -3964,13 +3959,23 @@ function StartScript(plf)
                                 d.B.Color = cBoxCol; d.B.Thickness = cBoxTh; d.B.Filled = false
                             elseif d.B.Visible then d.B.Visible = false end
                         end
+                        if d.GlowBox then
+                            if cBox and cfg.BoxGlow and cfg.BoxStyle == "2D" then
+                                if not d.GlowBox.Visible then d.GlowBox.Visible = true end
+                                d.GlowBox.Size = Vector2.new(wd, ht)
+                                d.GlowBox.Position = Vector2.new(psx - wd*0.5, tSy)
+                                d.GlowBox.Color = cBoxCol; d.GlowBox.Transparency = 0.75
+                                d.GlowBox.Filled = true
+                            elseif d.GlowBox.Visible then d.GlowBox.Visible = false end
+                        end
                         if d.C_Lines then
+                            local tL = Vector2.new(psx - wd*0.5, tSy)
+                            local tR = Vector2.new(psx + wd*0.5, tSy)
+                            local bL = Vector2.new(psx - wd*0.5, tSy + ht)
+                            local bR = Vector2.new(psx + wd*0.5, tSy + ht)
                             if cBox and cfg.BoxStyle == "Corner" then
-                                local tL, tR = Vector2.new(psx - wd*0.5, tSy), Vector2.new(psx + wd*0.5, tSy)
-                                local bL, bR = Vector2.new(psx - wd*0.5, tSy + ht), Vector2.new(psx + wd*0.5, tSy + ht)
                                 local cL = math.min(wd, ht) * 0.2
-                                
-                                local pairs = {
+                                local prs = {
                                     {tL, tL + Vector2.new(cL, 0)}, {tL, tL + Vector2.new(0, cL)},
                                     {tR, tR - Vector2.new(cL, 0)}, {tR, tR + Vector2.new(0, cL)},
                                     {bL, bL + Vector2.new(cL, 0)}, {bL, bL - Vector2.new(0, cL)},
@@ -3980,11 +3985,37 @@ function StartScript(plf)
                                     local ln = d.C_Lines[i]
                                     if ln then
                                         ln.Visible = true; ln.Color = cBoxCol; ln.Thickness = cBoxTh
-                                        setLinePoints(ln, pairs[i][1], pairs[i][2])
+                                        setLinePoints(ln, prs[i][1], prs[i][2])
+                                    end
+                                end
+                                for i = 9, 12 do
+                                    local ln = d.C_Lines[i]
+                                    if ln and ln.Visible then ln.Visible = false end
+                                end
+                            elseif cBox and cfg.BoxStyle == "3D" then
+                                local depth = math.min(wd, ht) * 0.08
+                                local backTL = tL + Vector2.new(depth, depth)
+                                local backTR = tR + Vector2.new(-depth, depth)
+                                local backBL = bL + Vector2.new(depth, -depth)
+                                local backBR = bR + Vector2.new(-depth, -depth)
+                                local prs = {
+                                    {tL, tR}, {tR, bR}, {bR, bL}, {bL, tL},
+                                    {backTL, backTR}, {backTR, backBR}, {backBR, backBL}, {backBL, backTL},
+                                    {tL, backTL}, {tR, backTR}, {bL, backBL}, {bR, backBR},
+                                }
+                                for i = 1, 12 do
+                                    local ln = d.C_Lines[i]
+                                    if ln and prs[i] then
+                                        ln.Visible = true; ln.Color = cBoxCol; ln.Thickness = cBoxTh
+                                        setLinePoints(ln, prs[i][1], prs[i][2])
+                                    elseif ln then
+                                        ln.Visible = false
                                     end
                                 end
                             else
-                                for i = 1, 8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end
+                                for i = 1, #d.C_Lines do
+                                    if d.C_Lines[i] then d.C_Lines[i].Visible = false end
+                                end
                             end
                         end
                         if d.BF then
@@ -3996,27 +4027,19 @@ function StartScript(plf)
                                 d.BF.Transparency = cBoxFillTrans
                             elseif d.BF.Visible then d.BF.Visible = false end
                         end
-                        
-                        -- Health Bar (Smart)
+
+                        -- Health Bar
                         if d.HB and d.HM and d.HPText then
                             if cHealth then
                                 local bX = psx - wd*0.5 - 6
                                 local ratio = 1
                                 if hum.MaxHealth > 0 then ratio = math.clamp(hum.Health / hum.MaxHealth, 0, 1) end
-                                
-                                -- Background
                                 if not d.HB.Visible then d.HB.Visible = true end
                                 setLinePoints(d.HB, Vector2.new(bX, tSy), Vector2.new(bX, tSy + ht))
-                                d.HB.Color = Color3.new(0,0,0)
-                                d.HB.Thickness = cHpTh + 2
-                                
-                                -- Fill
+                                d.HB.Color = Color3.new(0,0,0); d.HB.Thickness = cHpTh + 2
                                 if not d.HM.Visible then d.HM.Visible = true end
                                 setLinePoints(d.HM, Vector2.new(bX, tSy + ht), Vector2.new(bX, tSy + ht - (ht * ratio)))
-                                d.HM.Color = Color3.fromHSV(ratio * 0.3, 1, 1)
-                                d.HM.Thickness = cHpTh
-                                
-                                -- HP Text
+                                d.HM.Color = Color3.fromHSV(ratio * 0.3, 1, 1); d.HM.Thickness = cHpTh
                                 if cfg.ShowHPText then
                                     if not d.HPText.Visible then d.HPText.Visible = true end
                                     d.HPText.Text = math.floor(hum.Health) .. ""
@@ -4030,7 +4053,7 @@ function StartScript(plf)
                             end
                         end
 
-                        -- Name ESP (Side)
+                        -- Name ESP
                         if d.Name then
                             if cName then
                                 local sideX
@@ -4039,15 +4062,28 @@ function StartScript(plf)
                                 d.Name.Visible = true
                                 d.Name.Text = pl.DisplayName
                                 d.Name.Position = Vector2.new(sideX, tSy + (ht * 0.5))
-                                d.Name.Color = cNameCol
-                                d.Name.Size = cNameSz
-                                d.Name.Center = true
-                                d.Name.Outline = true
+                                d.Name.Color = cNameCol; d.Name.Size = cNameSz
+                                d.Name.Center = true; d.Name.Outline = true
                                 d.Name.OutlineColor = Color3.new(0, 0, 0)
                             elseif d.Name.Visible then d.Name.Visible = false end
                         end
-                        
-                        -- Distance
+                        if d.GlowName then
+                            if cName and cfg.NameGlow then
+                                local sideX
+                                if cHealth then sideX = psx + wd * 0.5 + 12
+                                else sideX = psx - wd * 0.5 - 12 end
+                                d.GlowName.Visible = true
+                                d.GlowName.Text = pl.DisplayName
+                                d.GlowName.Position = Vector2.new(sideX, tSy + (ht * 0.5))
+                                d.GlowName.Color = cNameCol
+                                d.GlowName.Size = cNameSz + 2
+                                d.GlowName.Center = true
+                                d.GlowName.Outline = true
+                                d.GlowName.OutlineColor = cNameCol
+                                d.GlowName.Transparency = 0.55
+                            elseif d.GlowName.Visible then d.GlowName.Visible = false end
+                        end
+
                         if d.D then
                             if cDist then
                                 if not d.D.Visible then d.D.Visible = true end
@@ -4069,18 +4105,27 @@ function StartScript(plf)
                                 d.T.Color = cTrCol; d.T.Thickness = cTrTh
                             elseif d.T.Visible then d.T.Visible = false end
                         end
+                        if d.GlowTracer then
+                            if cTracer and cfg.TracerGlow then
+                                if not d.GlowTracer.Visible then d.GlowTracer.Visible = true end
+                                local startY = 0
+                                if cfg.TracerOrigin == "Top" then startY = 0
+                                elseif cfg.TracerOrigin == "Bottom" then startY = vsy
+                                elseif cfg.TracerOrigin == "Middle" then startY = vsy * 0.5 end
+                                setLinePoints(d.GlowTracer, Vector2.new(halfX, startY), Vector2.new(psx, psy))
+                                d.GlowTracer.Color = cTrCol; d.GlowTracer.Thickness = cTrTh + 3
+                                d.GlowTracer.Transparency = 0.65
+                            elseif d.GlowTracer.Visible then d.GlowTracer.Visible = false end
+                        end
 
-                        -- LookTracer (Fixed)
+                        -- LookTracer
                         if d.LT then
                             local originPart = cfg.LookTracerOrigin == "Body" and hrp or ch:FindFirstChild("Head")
                             if cLookTr and originPart then
                                 local origin = originPart.Position
-                                local direction = originPart.CFrame.LookVector
-                                local tipPos = origin + direction * cfg.LookTracerLength
-                                
+                                local direction = originPart.CFrame.LookVector                                local tipPos = origin + direction * cfg.LookTracerLength
                                 local p1, on1 = c:WorldToViewportPoint(origin)
                                 local p2, on2 = c:WorldToViewportPoint(tipPos)
-                                
                                 if p1.Z > 0 and p2.Z > 0 then
                                     local baseTrans = cfg.LookTracerTransparency
                                     if cfg.LookTracerAnimate then
@@ -4088,15 +4133,9 @@ function StartScript(plf)
                                     end
                                     if not d.LT.Visible then d.LT.Visible = true end
                                     setLinePoints(d.LT, Vector2.new(p1.X, p1.Y), Vector2.new(p2.X, p2.Y))
-                                    d.LT.Color = cLtCol
-                                    d.LT.Thickness = cLtTh
-                                    d.LT.Transparency = baseTrans
-                                else
-                                    if d.LT.Visible then d.LT.Visible = false end
-                                end
-                            else
-                                if d.LT.Visible then d.LT.Visible = false end
-                            end
+                                    d.LT.Color = cLtCol; d.LT.Thickness = cLtTh; d.LT.Transparency = baseTrans
+                                elseif d.LT.Visible then d.LT.Visible = false end
+                            elseif d.LT.Visible then d.LT.Visible = false end
                         end
 
                         -- Bones
@@ -4130,10 +4169,12 @@ function StartScript(plf)
                             end
                         end
                     else
-                        -- Hide everything if out of range
                         if d.B and d.B.Visible then d.B.Visible = false end
                         if d.BF and d.BF.Visible then d.BF.Visible = false end
-                        if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
+                        if d.C_Lines then for i=1,#d.C_Lines do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
+                        if d.GlowBox and d.GlowBox.Visible then d.GlowBox.Visible = false end
+                        if d.GlowName and d.GlowName.Visible then d.GlowName.Visible = false end
+                        if d.GlowTracer and d.GlowTracer.Visible then d.GlowTracer.Visible = false end
                         if d.Name and d.Name.Visible then d.Name.Visible = false end
                         if d.D and d.D.Visible then d.D.Visible = false end
                         if d.HB and d.HB.Visible then d.HB.Visible = false end
@@ -4150,7 +4191,10 @@ function StartScript(plf)
             else
                 if d.B and d.B.Visible then d.B.Visible = false end
                 if d.BF and d.BF.Visible then d.BF.Visible = false end
-                if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
+                if d.C_Lines then for i=1,#d.C_Lines do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
+                if d.GlowBox and d.GlowBox.Visible then d.GlowBox.Visible = false end
+                if d.GlowName and d.GlowName.Visible then d.GlowName.Visible = false end
+                if d.GlowTracer and d.GlowTracer.Visible then d.GlowTracer.Visible = false end
                 if d.Name and d.Name.Visible then d.Name.Visible = false end
                 if d.D and d.D.Visible then d.D.Visible = false end
                 if d.HB and d.HB.Visible then d.HB.Visible = false end
@@ -4165,6 +4209,8 @@ function StartScript(plf)
             end
         end
 
+        -- AIM
+        local foundTarget = nil
         if cAim and not menuOpen then
             local bestScore, tg, tgPl = math.huge, nil, nil
             local useNearest = cfg.UseNearest
@@ -4216,6 +4262,7 @@ function StartScript(plf)
                 end
             end
             if tg and tgPl then
+                foundTarget = tgPl
                 local aimPos = CalcPred(tgPl, tg)
                 if aimPos then
                     local rx, ry = 0, 0
@@ -4225,9 +4272,35 @@ function StartScript(plf)
                     end
                     local rv, uv = camCF.RightVector, camCF.UpVector
                     currentAimPos = aimPos + rv * (cfg.OffsetX + rx) + uv * (cfg.OffsetY + ry)
+                    lastStickyTarget = tgPl
+                    lastStickyTime = tick()
                 end
-            else currentAimPos = nil end
-        else currentAimPos = nil end
+            end
+        end
+
+        -- FIXED: sticky / release — clears currentAimPos when no target
+        if cAim and not menuOpen then
+            if not foundTarget then
+                local stickyActive = false
+                if cfg.StickyAim and lastStickyTarget and tick() - lastStickyTime < cfg.StickyDuration then
+                    local ch = lastStickyTarget.Character
+                    if ch then
+                        local part = ch:FindFirstChild("Head")
+                        if part and (not cfg.WallCheck or vis(part)) then
+                            currentAimPos = part.Position
+                            stickyActive = true
+                        end
+                    end
+                end
+                if not stickyActive then
+                    currentAimPos = nil
+                    lastStickyTarget = nil
+                end
+            end
+        else
+            currentAimPos = nil
+            lastStickyTarget = nil
+        end
 
         if cfg.KillStats then
             local ks = _G.__zeva_killStatsGui
@@ -4301,14 +4374,14 @@ function StartScript(plf)
                 round(frame, 12); stroke(frame, TH.LineHi, 1, 0.4)
                 local holder = Instance.new("Frame", frame)
                 holder.Size, holder.BackgroundTransparency = UDim2.new(1,0,1,0), 1
-                
+
                 local selfContainer = Instance.new("Frame", holder)
                 selfContainer.Size = UDim2.new(0, 20, 0, 20)
                 selfContainer.AnchorPoint = Vector2.new(0.5, 0.5)
                 selfContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
                 selfContainer.BackgroundTransparency = 1
                 selfContainer.ZIndex = 2
-                
+
                 local selfLine = Instance.new("Frame", selfContainer)
                 selfLine.Size = UDim2.new(0, 2, 0, 8)
                 selfLine.AnchorPoint = Vector2.new(0.5, 1)
@@ -4317,7 +4390,7 @@ function StartScript(plf)
                 selfLine.BorderSizePixel = 0
                 round(selfLine, 1)
                 selfLine.ZIndex = 2
-                
+
                 local selfDot = Instance.new("Frame", selfContainer)
                 selfDot.Size, selfDot.BackgroundColor3, selfDot.BorderSizePixel = UDim2.new(0,6,0,6), cfg.RadarSelfColor, 0
                 selfDot.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -4331,10 +4404,10 @@ function StartScript(plf)
             if rd.frame.Size.X.Offset ~= cfg.RadarSize then rd.frame.Size = UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize) end
             local half = cfg.RadarSize * 0.5
             local range = cfg.RadarRange
-            
+
             local targetCamYaw = math.atan2(camCF.LookVector.X, -camCF.LookVector.Z)
             if rd.lastYaw == nil then rd.lastYaw = targetCamYaw end
-            
+
             if rd.selfDot then rd.selfDot.BackgroundColor3 = cfg.RadarSelfColor end
             if rd.selfLine then rd.selfLine.BackgroundColor3 = cfg.RadarSelfColor end
 
@@ -4361,7 +4434,7 @@ function StartScript(plf)
                                     container.AnchorPoint = Vector2.new(0.5, 0.5)
                                     container.BackgroundTransparency = 1
                                     container.ZIndex = 2
-                                    
+
                                     local aimLine = Instance.new("Frame", container)
                                     aimLine.Size = UDim2.new(0, 2, 0, 10)
                                     aimLine.AnchorPoint = Vector2.new(0.5, 1)
@@ -4369,7 +4442,7 @@ function StartScript(plf)
                                     aimLine.BorderSizePixel = 0
                                     round(aimLine, 1)
                                     aimLine.ZIndex = 2
-                                    
+
                                     local dot = Instance.new("Frame", container)
                                     dot.Size = UDim2.new(0, 6, 0, 6)
                                     dot.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -4377,20 +4450,31 @@ function StartScript(plf)
                                     dot.BorderSizePixel = 0
                                     round(dot, 3)
                                     dot.ZIndex = 3
-                                    
-                                    dItem = {container = container, aimLine = aimLine, dot = dot}
+
+                                    local nameLbl = Instance.new("TextLabel", container)
+                                    nameLbl.Size = UDim2.new(0, 80, 0, 12)
+                                    nameLbl.Position = UDim2.new(0.5, 10, 0.5, -6)
+                                    nameLbl.BackgroundTransparency = 1
+                                    nameLbl.TextColor3 = TH.Text
+                                    nameLbl.Font = FONTL; nameLbl.TextSize = 9
+                                    nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+                                    nameLbl.Text = ""
+                                    nameLbl.Visible = false
+                                    nameLbl.ZIndex = 4
+
+                                    dItem = {container = container, aimLine = aimLine, dot = dot, nameLbl = nameLbl}
                                     dots[idx] = dItem
                                 end
-                                
+
                                 local targetAngle = math.atan2(rel.X, -rel.Z)
                                 local relAngle = targetAngle - camYaw
-                                
+
                                 local sx = half + math.sin(relAngle) * (dist / range) * half
                                 local sy = half - math.cos(relAngle) * (dist / range) * half
-                                
+
                                 dItem.container.Position = UDim2.new(0, sx, 0, sy)
                                 dItem.container.Visible = true
-                                
+
                                 local isTeammate = cfg.TeamCheck and pl.Team and p.Team and pl.Team == p.Team
                                 local dotCol = isTeammate and cfg.RadarTeamColor or cfg.RadarEnemyColor
                                 dItem.dot.BackgroundColor3 = dotCol
@@ -4400,6 +4484,14 @@ function StartScript(plf)
                                 local pAimAngle = math.atan2(look.X, -look.Z)
                                 local relAimAngle = pAimAngle - camYaw
                                 dItem.aimLine.Rotation = math.deg(relAimAngle)
+
+                                if cfg.RadarShowNames and dItem.nameLbl then
+                                    dItem.nameLbl.Visible = true
+                                    dItem.nameLbl.Text = pl.DisplayName
+                                    dItem.nameLbl.TextColor3 = dotCol
+                                elseif dItem.nameLbl then
+                                    dItem.nameLbl.Visible = false
+                                end
                             end
                         end
                     end
@@ -4466,7 +4558,12 @@ function StartScript(plf)
                                 end)
                                 lastT = tick() + math.max(0.03, math.random() * cfg.RandDelay)
                                 killStats.hits = killStats.hits + 1
-                                if cfg.HitSound and hitSound and tick() - lastHit > 0.15 then hitSound:Play(); lastHit = tick() end
+                                if cfg.HitMarker then flashHitMarker() end
+                                if cfg.HitSound and hitSound and tick() - lastHit > 0.15 then
+                                    hitSound.SoundId = rollHitSound()
+                                    hitSound:Play()
+                                    lastHit = tick()
+                                end
                             end
                         end
                     end
@@ -4489,6 +4586,9 @@ function StartScript(plf)
             pcall(function() if d.D then d.D:Remove() end end)
             pcall(function() if d.T then d.T:Remove() end end)
             pcall(function() if d.LT then d.LT:Remove() end end)
+            pcall(function() if d.GlowBox then d.GlowBox:Remove() end end)
+            pcall(function() if d.GlowName then d.GlowName:Remove() end end)
+            pcall(function() if d.GlowTracer then d.GlowTracer:Remove() end end)
             for _, l in pairs(d.L) do pcall(function() if l then l:Remove() end end) end
             for _, l in pairs(d.C_Lines) do pcall(function() if l then l:Remove() end end) end
             dr[pl] = nil

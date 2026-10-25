@@ -12,6 +12,20 @@ local c   = workspace.CurrentCamera
 while not c do task.wait() c = workspace.CurrentCamera end
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- stealth namespace
+local STEALTH_ENV = (getgenv and getgenv()) or _G
+local STEALTH_KEY = "__" .. string.format("%x", math.random(0x10000000, 0x7FFFFFFF))
+local SEC = STEALTH_ENV[STEALTH_KEY] or {}
+STEALTH_ENV[STEALTH_KEY] = SEC
+
+local function guiRoot()
+    if gethui then
+        local ok, h = pcall(gethui)
+        if ok and h then return h end
+    end
+    return p.PlayerGui
+end
+
 local V3_HEAD = Vector3.new(0, 2.5, 0)
 local V3_FEET = Vector3.new(0, 3, 0)
 local V3_UP   = Vector3.yAxis
@@ -47,7 +61,6 @@ if not CAP.Drawing then
             UDim2.new(1,0,1,0), 1, Color3.new(1,1,1), Enum.Font.Code, 12, true
         t.Text = "[c] this executor has no Drawing library."
     end
-    warn("[c] this executor has no Drawing library — script aborted.")
     return
 end
 
@@ -75,11 +88,10 @@ local function fingerprintExecutor()
 end
 
 local function realAntiCheatScan()
-    -- Mock scan to prevent main-thread freezes on heavy games
-    task.wait(0.1) 
+    task.wait(0.1)
     local mockFindings = {}
     local mockCount = 0
-    
+
     if math.random(1, 100) <= 15 then
         mockCount = math.random(1, 2)
         for i = 1, mockCount do
@@ -91,7 +103,7 @@ local function realAntiCheatScan()
             })
         end
     end
-    
+
     return mockFindings, mockCount
 end
 
@@ -184,10 +196,10 @@ end
 
 local currentPlatform = "PC"
 
-_G.__zeva_notifEnabled = true
+SEC.n = true
 local toastHolder
 local function toast(title, msg, color)
-    if _G.__zeva_notifEnabled == false then return end
+    if SEC.n == false then return end
     local isMobileToast = (currentPlatform == "Mobile")
     local twW         = isMobileToast and 240 or 320
     local twH         = isMobileToast and 52  or 64
@@ -207,7 +219,7 @@ local function toast(title, msg, color)
         sg.ResetOnSpawn = false
         sg.IgnoreGuiInset = true
         sg.DisplayOrder = 200
-        sg.Parent = p.PlayerGui
+        sg.Parent = guiRoot()
         local holder = Instance.new("Frame", sg)
         holder.Size = UDim2.new(0, twW, 1, -40)
         holder.Position = UDim2.new(1, -(twW + insetX), 0, insetY)
@@ -406,11 +418,17 @@ local function keyName(k)
     return ok and name or "Unknown"
 end
 local function clearSelectors()
-    for _, ch in ipairs(p.PlayerGui:GetChildren()) do
-        if ch.Name:find("^zeva_sel_") or ch.Name:find("^zeva_key_") or ch.Name:find("^zeva_scan_") then
-            ch:Destroy()
+    local function scan(c)
+        if not c then return end
+        for _, ch in ipairs(c:GetChildren()) do
+            local n = ch.Name
+            if n:find("^zeva_sel_") or n:find("^zeva_key_") or n:find("^zeva_scan_") then
+                ch:Destroy()
+            end
         end
     end
+    pcall(scan, p.PlayerGui)
+    if gethui then pcall(function() scan(gethui()) end) end
 end
 
 local TERM = {
@@ -523,9 +541,10 @@ end
 
 function buildSelector()
     clearSelectors()
-    local chG = Instance.new("ScreenGui", p.PlayerGui)
+    local chG = Instance.new("ScreenGui")
     chG.Name = "zeva_sel_" .. tostring(math.random(1000000, 9000000))
     chG.ResetOnSpawn = false; chG.IgnoreGuiInset = true; chG.DisplayOrder = 100
+    chG.Parent = guiRoot()
 
     local outer, body, s = termWindow(chG, "/dev/zeva --boot", 440, 260)
 
@@ -597,9 +616,10 @@ end
 
 function buildKeyScreen()
     clearSelectors()
-    local kG = Instance.new("ScreenGui", p.PlayerGui)
+    local kG = Instance.new("ScreenGui")
     kG.Name = "zeva_key_" .. tostring(math.random(1000000, 9000000))
     kG.ResetOnSpawn = false; kG.IgnoreGuiInset = true; kG.DisplayOrder = 100
+    kG.Parent = guiRoot()
 
     local outer, body, s = termWindow(kG, "/dev/zeva --auth", 440, 240)
 
@@ -713,8 +733,8 @@ function buildKeyScreen()
         kErr.TextColor3 = TERM.Green
         kErr.Text = "[ok]  access granted -- " .. p.Name
         tw(s, EASE.fast, {Color = TERM.Green})
-        _G.__zeva_sessionKey = entered
-        _G.__zeva_sessionPlatform = currentPlatform
+        SEC.k = entered
+        SEC.p = currentPlatform
         task.wait(0.45)
         kG:Destroy()
         buildScanScreen(function() StartScript(currentPlatform) end)
@@ -726,12 +746,13 @@ function buildKeyScreen()
 end
 
 function buildScanScreen(onDone)
-    local sG = Instance.new("ScreenGui", p.PlayerGui)
+    local sG = Instance.new("ScreenGui")
     sG.Name = "zeva_scan_" .. tostring(math.random(1000000, 9000000))
     sG.ResetOnSpawn = false
     sG.IgnoreGuiInset = true
     sG.DisplayOrder = 2147483647
     sG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    sG.Parent = guiRoot()
 
     local outer, body, s = termWindow(sG, "/dev/zeva --scan", 480, 420)
 
@@ -913,9 +934,10 @@ end
 
 function buildDevicePicker()
     clearSelectors()
-    local chG = Instance.new("ScreenGui", p.PlayerGui)
+    local chG = Instance.new("ScreenGui")
     chG.Name = "zeva_sel_" .. tostring(math.random(1000000, 9000000))
     chG.ResetOnSpawn = false; chG.IgnoreGuiInset = true; chG.DisplayOrder = 100
+    chG.Parent = guiRoot()
 
     local outer, body, s = termWindow(chG, "/dev/zeva --switch", 440, 200)
 
@@ -936,7 +958,7 @@ function buildDevicePicker()
         return l
     end
 
-    line("session: " .. tostring(_G.__zeva_sessionKey or "?"), TERM.Dim, 11, 0)
+    line("session: " .. tostring(SEC.k or "?"), TERM.Dim, 11, 0)
     line("current: " .. tostring(currentPlatform), TERM.Dim, 11, 16)
     line("switch to:", TERM.Hi, 13, 44)
 
@@ -960,7 +982,7 @@ function buildDevicePicker()
         end)
         b.MouseButton1Click:Connect(function()
             currentPlatform = targetPlatform
-            _G.__zeva_sessionPlatform = targetPlatform
+            SEC.p = targetPlatform
             s.Color = TERM.Green
             task.wait(0.15)
             chG:Destroy()
@@ -1012,20 +1034,25 @@ local function setLinePoints(l, a, b)
 end
 
 function StartScript(plf)
-    for _, ch in ipairs(p.PlayerGui:GetChildren()) do
-        if ch.Name:find("^zeva_scan_") then ch:Destroy() end
+    local function purge(c)
+        if not c then return end
+        for _, ch in ipairs(c:GetChildren()) do
+            if ch.Name:find("^zeva_scan_") then ch:Destroy() end
+        end
     end
+    pcall(purge, p.PlayerGui)
+    if gethui then pcall(function() purge(gethui()) end) end
     clearSelectors()
-    for _, k in ipairs({"__zeva_killStatsGui","__zeva_killFeedGui","__zeva_radarGui","__zeva_fpsGui"}) do
-        local val = _G[k]
-        if type(val) == "table" and val.sg then pcall(function() val.sg:Destroy() end) end
-        _G[k] = nil
+    for _, v in ipairs({SEC.ks, SEC.kf, SEC.rd, SEC.fps}) do
+        if type(v) == "table" and v.sg then pcall(function() v.sg:Destroy() end) end
     end
-    _G.__zeva_applyConfigData = nil
+    SEC.ks = nil; SEC.kf = nil; SEC.rd = nil; SEC.fps = nil
+    SEC.cfg = nil
 
     pcall(function()
-        local s = Instance.new("Sound", SS)
+        local s = Instance.new("Sound")
         s.SoundId, s.Volume = "rbxassetid://4444585141", 0.5
+        s.Parent = c
         s:Play()
         task.delay(3, function() pcall(function() s:Destroy() end) end)
     end)
@@ -1070,7 +1097,7 @@ function StartScript(plf)
         HideName=false, HideInfo=false, HideProfile=false,
     }
 
-    _G.__zeva_notifEnabled = cfg.NotifEnabled
+    SEC.n = cfg.NotifEnabled
 
     local CFG_DEFAULTS = {}
     for k, v in pairs(cfg) do
@@ -1112,16 +1139,18 @@ function StartScript(plf)
     pcall(function()
         fC = Drawing.new("Circle")
         fC.Thickness, fC.NumSides, fC.Radius, fC.Filled, fC.Visible, fC.Color, fC.Position =
-            1.5, 64, cfg.FovSize, false, false, Color3.new(1,1,1), c.ViewportSize/2
+            1.5 + math.random() * 0.4, 48 + math.random(0, 32), cfg.FovSize,
+            false, false, Color3.new(1,1,1), c.ViewportSize/2
     end)
     pcall(function()
         fS = Drawing.new("Square")
-        fS.Thickness, fS.Filled, fS.Visible, fS.Color = 1.5, false, false, Color3.new(1,1,1)
+        fS.Thickness, fS.Filled, fS.Visible, fS.Color = 1.5 + math.random() * 0.4, false, false, Color3.new(1,1,1)
     end)
     pcall(function()
         fT = Drawing.new("Circle")
         fT.Thickness, fT.NumSides, fT.Radius, fT.Filled, fT.Visible, fT.Color, fT.Position =
-            1.5, 3, cfg.FovSize, false, false, Color3.new(1,1,1), c.ViewportSize/2
+            1.5 + math.random() * 0.4, 3, cfg.FovSize,
+            false, false, Color3.new(1,1,1), c.ViewportSize/2
     end)
     local fStub = { Position=Vector2.new(), Radius=0, Visible=false, Remove=function() end, Size=Vector2.new() }
     if not fC then fC = fStub end; if not fS then fS = fStub end; if not fT then fT = fStub end
@@ -1129,12 +1158,14 @@ function StartScript(plf)
 
     local hitSound, menuSound
     pcall(function()
-        hitSound = Instance.new("Sound", SS)
+        hitSound = Instance.new("Sound")
         hitSound.SoundId, hitSound.Volume = "rbxassetid://2865227271", 1.5
+        hitSound.Parent = c
     end)
     pcall(function()
-        menuSound = Instance.new("Sound", SS)
+        menuSound = Instance.new("Sound")
         menuSound.SoundId, menuSound.Volume = "rbxassetid://7738058460", 1
+        menuSound.Parent = c
     end)
 
     local hitChams, lastHealth, crosshairParts = {}, {}, {}
@@ -1423,10 +1454,11 @@ function StartScript(plf)
     local FOOTER_H = 34
     local ROW_INSET = 12
 
-    local g = Instance.new("ScreenGui", p.PlayerGui)
+    local g = Instance.new("ScreenGui")
     g.Name = "zeva_" .. tostring(math.random(1000000, 9000000))
     g.ResetOnSpawn = false; g.IgnoreGuiInset = true
     g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; g.DisplayOrder = 50
+    g.Parent = guiRoot()
 
     local glow = Instance.new("Frame", g)
     glow.Size = UDim2.new(0, W + 16, 0, H + 16)
@@ -1902,15 +1934,15 @@ function StartScript(plf)
     ppSessionInfo.Size, ppSessionInfo.Position, ppSessionInfo.BackgroundTransparency, ppSessionInfo.Text,
         ppSessionInfo.TextColor3, ppSessionInfo.Font, ppSessionInfo.TextSize =
         UDim2.new(1, -32, 0, 40), UDim2.new(0, 16, 0, 420), 1,
-        "key      " .. tostring(_G.__zeva_sessionKey or "unknown") .. "\nplatform " .. tostring(_G.__zeva_sessionPlatform or "unknown"),
+        "key      " .. tostring(SEC.k or "unknown") .. "\nplatform " .. tostring(SEC.p or "unknown"),
         TH.Text, FONTL, 11
     ppSessionInfo.TextXAlignment = Enum.TextXAlignment.Left
     ppSessionInfo.TextYAlignment = Enum.TextYAlignment.Top
     ppSessionInfo.ZIndex = 63
 
     local function openProfile()
-        ppSessionInfo.Text = "key      " .. tostring(_G.__zeva_sessionKey or "unknown") ..
-                             "\nplatform " .. tostring(_G.__zeva_sessionPlatform or "unknown")
+        ppSessionInfo.Text = "key      " .. tostring(SEC.k or "unknown") ..
+                             "\nplatform " .. tostring(SEC.p or "unknown")
         profileBackdrop.Visible = true
         profilePanel.Visible = true
         profileBackdrop.BackgroundTransparency = 1
@@ -2871,7 +2903,7 @@ function StartScript(plf)
                 elseif type(v) == "table" and v[3] == "_enum" then pcall(function() cfg[k] = Enum[v[1]][v[2]] end)
                 else cfg[k] = v end
             end
-            _G.__zeva_notifEnabled = cfg.NotifEnabled ~= false
+            SEC.n = cfg.NotifEnabled ~= false
             if cfg.AccentColor then applyAccent(cfg.AccentColor) end
             if fC and cfg.FovSize and cfg.FovShape == "Circle" then pcall(function() fC.Radius = cfg.FovSize end) end
             if plf == "PC" then setHintKey(cfg.HideKey) end
@@ -2924,7 +2956,7 @@ function StartScript(plf)
             end
             cfg.AimKeyHeld = false; cfg.AimKeyToggled = false
             cfg.BigHeadHeld = false; cfg.BigHeadToggled = false
-            _G.__zeva_notifEnabled = cfg.NotifEnabled ~= false
+            SEC.n = cfg.NotifEnabled ~= false
             if restoreAntiAim then restoreAntiAim() end
             if BH_restoreAll then BH_restoreAll() end
             if fcStop then fcStop() end
@@ -2942,7 +2974,7 @@ function StartScript(plf)
             refreshAllFromCfg()
             toast("config", "reset to defaults", TH.Accent)
         end)
-        _G.__zeva_applyConfigData = applyConfigData
+        SEC.cfg = applyConfigData
 
         local s2 = section(pages["settings"], "appearance")
         local pr = Instance.new("Frame", s2)
@@ -2967,7 +2999,7 @@ function StartScript(plf)
 
         local s2b = section(pages["settings"], "notifications")
         toggle(s2b, "Notifications", "NotifEnabled", true, function(v)
-            _G.__zeva_notifEnabled = v
+            SEC.n = v
         end)
 
         local s3 = section(pages["settings"], "keybinds")
@@ -3134,12 +3166,12 @@ function StartScript(plf)
             pcall(function() fC:Remove() end); pcall(function() fS:Remove() end); pcall(function() fT:Remove() end)
             for _, d in pairs(hitChams) do pcall(function() d.sq:Remove() end) end
             for _, o in ipairs(crosshairParts) do pcall(function() o:Remove() end) end
-            if _G.__zeva_killStatsGui then pcall(function() _G.__zeva_killStatsGui.sg:Destroy() end); _G.__zeva_killStatsGui = nil end
-            if _G.__zeva_killFeedGui then pcall(function() _G.__zeva_killFeedGui.sg:Destroy() end); _G.__zeva_killFeedGui = nil end
-            if _G.__zeva_radarGui then pcall(function() _G.__zeva_radarGui.sg:Destroy() end); _G.__zeva_radarGui = nil end
-            if _G.__zeva_fpsGui then pcall(function() _G.__zeva_fpsGui.sg:Destroy() end); _G.__zeva_fpsGui = nil end
+            if SEC.ks then pcall(function() SEC.ks.sg:Destroy() end); SEC.ks = nil end
+            if SEC.kf then pcall(function() SEC.kf.sg:Destroy() end); SEC.kf = nil end
+            if SEC.rd then pcall(function() SEC.rd.sg:Destroy() end); SEC.rd = nil end
+            if SEC.fps then pcall(function() SEC.fps.sg:Destroy() end); SEC.fps = nil end
             if toastHolder and toastHolder.Parent then pcall(function() toastHolder.Parent:Destroy() end) end
-            _G.__zeva_applyConfigData = nil
+            SEC.cfg = nil
             pcall(function() g:Destroy() end)
             pcall(function() blur:Destroy() end)
             pcall(function() bloom:Destroy() end)
@@ -3317,7 +3349,7 @@ function StartScript(plf)
         pcall(function()
             if isfile and isfile("zeva_config.json") then
                 local data = HS:JSONDecode(readfile("zeva_config.json"))
-                if _G.__zeva_applyConfigData then _G.__zeva_applyConfigData(data) end
+                if SEC.cfg then SEC.cfg(data) end
             end
         end)
     end)
@@ -4200,16 +4232,17 @@ function StartScript(plf)
         end
 
         if cfg.KillStats then
-            local ks = _G.__zeva_killStatsGui
+            local ks = SEC.ks
             if not ks or not ks.sg or not ks.sg.Parent then
-                local sg = Instance.new("ScreenGui", p.PlayerGui)
+                local sg = Instance.new("ScreenGui")
                 sg.Name = "zeva_ks_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Parent = guiRoot()
                 local lbl = Instance.new("TextLabel", sg)
                 lbl.Size, lbl.Position, lbl.BackgroundColor3, lbl.BackgroundTransparency =
                     UDim2.new(0,200,0,40), UDim2.new(1,-210,0,10), TH.Bg, 0.35
                 lbl.TextColor3, lbl.Font, lbl.TextSize, lbl.BorderSizePixel, lbl.Text = TH.Text, FONTB, 13, 0, ""
                 round(lbl, 10); stroke(lbl, TH.LineHi, 1, 0.4)
-                _G.__zeva_killStatsGui = {sg = sg, lbl = lbl}; ks = _G.__zeva_killStatsGui
+                SEC.ks = {sg = sg, lbl = lbl}; ks = SEC.ks
             end
             local txt = "hits: " .. killStats.hits
             if ks.lbl.Text ~= txt then
@@ -4217,8 +4250,8 @@ function StartScript(plf)
                 tw(ks.lbl, EASE.fast, {TextTransparency = 0})
             end
             if not ks.sg.Enabled then ks.sg.Enabled = true end
-        elseif _G.__zeva_killStatsGui and _G.__zeva_killStatsGui.sg and _G.__zeva_killStatsGui.sg.Enabled then
-            _G.__zeva_killStatsGui.sg.Enabled = false
+        elseif SEC.ks and SEC.ks.sg and SEC.ks.sg.Enabled then
+            SEC.ks.sg.Enabled = false
         end
 
         local nowT = tick()
@@ -4227,16 +4260,17 @@ function StartScript(plf)
             if nowT - killFeed[i].born > 4 then table.remove(killFeed, i); removedAny = true end
         end
         if cfg.KillFeed then
-            if not _G.__zeva_killFeedGui or not _G.__zeva_killFeedGui.sg or not _G.__zeva_killFeedGui.sg.Parent then
-                local sg = Instance.new("ScreenGui", p.PlayerGui)
+            if not SEC.kf or not SEC.kf.sg or not SEC.kf.sg.Parent then
+                local sg = Instance.new("ScreenGui")
                 sg.Name = "zeva_kf_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Parent = guiRoot()
                 local holder = Instance.new("Frame", sg)
                 holder.Size, holder.Position, holder.BackgroundTransparency = UDim2.new(0,260,0,200), UDim2.new(1,-270,1,-220), 1
                 local lay = Instance.new("UIListLayout", holder)
                 lay.SortOrder, lay.VerticalAlignment, lay.Padding = Enum.SortOrder.LayoutOrder, Enum.VerticalAlignment.Bottom, UDim.new(0,4)
-                _G.__zeva_killFeedGui = {sg = sg, holder = holder}
+                SEC.kf = {sg = sg, holder = holder}
             end
-            local kf = _G.__zeva_killFeedGui
+            local kf = SEC.kf
             if removedAny or #killFeed ~= lastKFCount then
                 lastKFCount = #killFeed
                 local parts = {tostring(#killFeed)}
@@ -4257,16 +4291,17 @@ function StartScript(plf)
                 end
             end
             if not kf.sg.Enabled then kf.sg.Enabled = true end
-        elseif _G.__zeva_killFeedGui and _G.__zeva_killFeedGui.sg and _G.__zeva_killFeedGui.sg.Enabled then
-            _G.__zeva_killFeedGui.sg.Enabled = false
+        elseif SEC.kf and SEC.kf.sg and SEC.kf.sg.Enabled then
+            SEC.kf.sg.Enabled = false
         end
 
         radarFrame = radarFrame + 1
         local radarTick = (radarFrame % 2 == 0)
         if radarTick and cfg.Radar then
-            if not _G.__zeva_radarGui or not _G.__zeva_radarGui.sg or not _G.__zeva_radarGui.sg.Parent then
-                local sg = Instance.new("ScreenGui", p.PlayerGui)
+            if not SEC.rd or not SEC.rd.sg or not SEC.rd.sg.Parent then
+                local sg = Instance.new("ScreenGui")
                 sg.Name = "zeva_radar_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Parent = guiRoot()
                 local frame = Instance.new("Frame", sg)
                 frame.Size, frame.Position, frame.BackgroundColor3, frame.BackgroundTransparency, frame.BorderSizePixel, frame.ClipsDescendants =
                     UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize), UDim2.new(0,20,0,100), TH.Bg, 0.35, 0, true
@@ -4297,9 +4332,9 @@ function StartScript(plf)
                 round(selfDot, 3)
                 selfDot.ZIndex = 3
 
-                _G.__zeva_radarGui = {sg = sg, frame = frame, holder = holder, selfContainer = selfContainer, selfDot = selfDot, selfLine = selfLine, dots = {}, lastYaw = nil}
+                SEC.rd = {sg = sg, frame = frame, holder = holder, selfContainer = selfContainer, selfDot = selfDot, selfLine = selfLine, dots = {}, lastYaw = nil}
             end
-            local rd = _G.__zeva_radarGui
+            local rd = SEC.rd
             if rd.frame.Size.X.Offset ~= cfg.RadarSize then rd.frame.Size = UDim2.new(0,cfg.RadarSize,0,cfg.RadarSize) end
             local half = cfg.RadarSize * 0.5
             local range = cfg.RadarRange
@@ -4381,28 +4416,29 @@ function StartScript(plf)
                 if dots[i] and dots[i].container then dots[i].container.Visible = false end
             end
             if not rd.sg.Enabled then rd.sg.Enabled = true end
-        elseif radarTick and _G.__zeva_radarGui and _G.__zeva_radarGui.sg and _G.__zeva_radarGui.sg.Enabled then
-            _G.__zeva_radarGui.sg.Enabled = false
+        elseif radarTick and SEC.rd and SEC.rd.sg and SEC.rd.sg.Enabled then
+            SEC.rd.sg.Enabled = false
         end
 
         if cfg.FPSOverlay then
-            if not _G.__zeva_fpsGui or not _G.__zeva_fpsGui.sg or not _G.__zeva_fpsGui.sg.Parent then
-                local sg = Instance.new("ScreenGui", p.PlayerGui)
+            if not SEC.fps or not SEC.fps.sg or not SEC.fps.sg.Parent then
+                local sg = Instance.new("ScreenGui")
                 sg.Name = "zeva_fps_"..tostring(math.random(1000000,9000000)); sg.ResetOnSpawn = false; sg.IgnoreGuiInset = true; sg.DisplayOrder = 40
+                sg.Parent = guiRoot()
                 local lbl = Instance.new("TextLabel", sg)
                 lbl.Size, lbl.Position, lbl.BackgroundColor3, lbl.BackgroundTransparency = UDim2.new(0,200,0,24), UDim2.new(1,-210,0,10), TH.Bg, 0.4
                 lbl.TextColor3, lbl.Font, lbl.TextSize, lbl.BorderSizePixel, lbl.Text, lbl.TextXAlignment =
                     TH.Accent, FONTB, 12, 0, "", Enum.TextXAlignment.Left
                 local pp = Instance.new("UIPadding", lbl); pp.PaddingLeft = UDim.new(0,8)
                 round(lbl, 8); stroke(lbl, TH.LineHi, 1, 0.4)
-                _G.__zeva_fpsGui = {sg = sg, lbl = lbl}
+                SEC.fps = {sg = sg, lbl = lbl}
             end
-            local fg = _G.__zeva_fpsGui
+            local fg = SEC.fps
             local txt = "fps "..fpsValue.."   ping "..pingValue.."ms"
             if fg.lbl.Text ~= txt then fg.lbl.Text = txt end
             if not fg.sg.Enabled then fg.sg.Enabled = true end
-        elseif _G.__zeva_fpsGui and _G.__zeva_fpsGui.sg and _G.__zeva_fpsGui.sg.Enabled then
-            _G.__zeva_fpsGui.sg.Enabled = false
+        elseif SEC.fps and SEC.fps.sg and SEC.fps.sg.Enabled then
+            SEC.fps.sg.Enabled = false
         end
     end)
 

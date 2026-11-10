@@ -400,9 +400,9 @@ local function ripple(parent, x, y)
 end
 
 local KEY_WHITELIST = {
-    ["zevadenganteng"] = { "zevadenabcd" },
+    ["z"] = { "zevadenabcd" },
     ["ardananjing"]    = { "andymunoz" },
-    ["u"] = { "unique_ocelot95" },
+    ["u"] = { "unique_ocelot835" },
 }
 local function keyName(k)
     if k == nil then return "None" end

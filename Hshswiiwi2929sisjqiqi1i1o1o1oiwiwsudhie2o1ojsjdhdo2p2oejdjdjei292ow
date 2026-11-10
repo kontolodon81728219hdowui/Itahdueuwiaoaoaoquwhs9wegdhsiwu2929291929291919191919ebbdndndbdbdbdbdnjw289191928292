@@ -23,7 +23,8 @@ local function guiRoot()
         local ok, h = pcall(gethui)
         if ok and h then return h end
     end
-    return p.PlayerGui
+    local pg = p:FindFirstChild("PlayerGui") or p:WaitForChild("PlayerGui", 5)
+    return pg or p.PlayerGui
 end
 
 local V3_HEAD = Vector3.new(0, 2.5, 0)
@@ -41,6 +42,11 @@ pcall(function()
     CAP.Drawing = type(env.Drawing) == "table" and type(env.Drawing.new) == "function"
 end)
 if not CAP.Drawing then
+    pcall(function()
+        if type(Drawing) == "table" and type(Drawing.new) == "function" then CAP.Drawing = true end
+    end)
+end
+if not CAP.Drawing then
     for _, alias in ipairs({"drawing","DrawingLib","draw"}) do
         local cand = rawget(_G, alias)
         if type(cand) == "table" and type(cand.new) == "function" then
@@ -49,19 +55,8 @@ if not CAP.Drawing then
     end
 end
 if not CAP.Drawing then
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "CinderMsg"
-    pcall(function() sg.Parent = p:WaitForChild("PlayerGui", 5) end)
-    if sg.Parent then
-        local f = Instance.new("Frame", sg)
-        f.Size, f.Position, f.BackgroundColor3, f.BorderSizePixel =
-            UDim2.new(0,320,0,90), UDim2.new(.5,-160,.5,-45), Color3.fromRGB(10,10,12), 0
-        local t = Instance.new("TextLabel", f)
-        t.Size, t.BackgroundTransparency, t.TextColor3, t.Font, t.TextSize, t.TextWrapped =
-            UDim2.new(1,0,1,0), 1, Color3.new(1,1,1), Enum.Font.Code, 12, true
-        t.Text = "[c] this executor has no Drawing library."
-    end
-    return
+    -- soft fail: continue without Drawing (ESP/FOV/crosshair disabled, menu still works)
+    warn("[zeva] Drawing library not found — ESP / FOV / crosshair will be unavailable")
 end
 
 local function fingerprintExecutor()
@@ -407,7 +402,7 @@ end
 local KEY_WHITELIST = {
     ["zevadenganteng"] = { "zevadenalt" },
     ["ardananjing"]    = { "andymunoz" },
-    ["u"] = { "Unique_Ocelot835" },
+    ["u"] = { "unique_ocelot95" },
 }
 local function keyName(k)
     if k == nil then return "None" end
@@ -737,7 +732,13 @@ function buildKeyScreen()
         SEC.p = currentPlatform
         task.wait(0.45)
         kG:Destroy()
-        buildScanScreen(function() StartScript(currentPlatform) end)
+        buildScanScreen(function()
+            local ok, err = pcall(StartScript, currentPlatform)
+            if not ok then
+                warn("[zeva] StartScript error:", err)
+                pcall(function() toast("error", "menu failed to load — check console", TH.Danger) end)
+            end
+        end)
     end
 
     kSubmit.MouseButton1Click:Connect(trySubmit)
@@ -1086,6 +1087,12 @@ function StartScript(plf)
         BoxThickness=1, BoneThickness=1, HealthThickness=3, TracerThickness=1,
         LookTracerThickness=1, BoxFilled=false, BoxFilledColor=Color3.fromRGB(255,255,255), BoxFilledTransparency=0.5, ESPFontSize=12,
         BoxStyle="2D", TracerOrigin="Top", ShowHPText=false,
+        HeadDot=false, HeadDotSize=4, HeadDotColor=Color3.fromRGB(255,255,255),
+        OffscreenArrows=false, ArrowSize=12, ArrowColor=Color3.fromRGB(255,80,80),
+        WeaponESP=false, WeaponColor=Color3.fromRGB(255,200,80),
+        GlowBox=false, GlowColor=Color3.fromRGB(150,130,255), GlowTransparency=0.75,
+        VisCheckColor=false, VisibleColor=Color3.fromRGB(120,220,165), HiddenColor=Color3.fromRGB(244,106,122),
+        DistanceColorScale=true,
         Radar=false, RadarSize=140, RadarRange=200,
         RadarEnemyColor=Color3.fromRGB(244,106,122), RadarTeamColor=Color3.fromRGB(120,220,165), RadarSelfColor=Color3.fromRGB(150,130,255),
         AntiAimEnabled=false, AntiAimMode="Static", AntiAimPitch=0, AntiAimYaw=180, AntiAimSpinSpeed=8,
@@ -1457,7 +1464,7 @@ function StartScript(plf)
     local g = Instance.new("ScreenGui")
     g.Name = "zeva_" .. tostring(math.random(1000000, 9000000))
     g.ResetOnSpawn = false; g.IgnoreGuiInset = true
-    g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; g.DisplayOrder = 50
+    g.ZIndexBehavior = Enum.ZIndexBehavior.Sibling; g.DisplayOrder = 999
     g.Parent = guiRoot()
 
     local glow = Instance.new("Frame", g)
@@ -1498,7 +1505,21 @@ function StartScript(plf)
         root.Visible = v
         glow.Visible = v
         setVibe(v)
+        if v then
+            pcall(function()
+                root.BackgroundTransparency = 0.15
+                rootStroke.Transparency = 0.2
+            end)
+        end
     end
+    -- force menu open on load
+    root.Visible = true
+    glow.Visible = true
+    pcall(function()
+        task.delay(0.6, function()
+            toast("zeva", "menu ready — press [ to toggle", TH.On)
+        end)
+    end)
 
     local title = Instance.new("Frame", root)
     title.Size = UDim2.new(1, 0, 0, TITLE_H)
@@ -2711,6 +2732,10 @@ function StartScript(plf)
         cycleRow(s, "Tracer Origin", "TracerOrigin", {"Top", "Middle", "Bottom"})
         toggle(s, "Look Tracer", "LookTracer", false, function(v) cfg.LookTracer = v end)
         cycleRow(s, "LookTracer Origin", "LookTracerOrigin", {"Head", "Body"})
+        toggle(s, "Head Dot", "HeadDot", false, function(v) cfg.HeadDot = v end)
+        toggle(s, "Glow Box", "GlowBox", false, function(v) cfg.GlowBox = v end)
+        toggle(s, "Weapon ESP", "WeaponESP", false, function(v) cfg.WeaponESP = v end)
+        toggle(s, "Offscreen Arrows", "OffscreenArrows", false, function(v) cfg.OffscreenArrows = v end)
 
         local s2 = section(pages["esp"], "filters")
         toggle(s2, "Team Check", "TeamCheck", false, function(v) cfg.TeamCheck = v end)
@@ -2726,6 +2751,13 @@ function StartScript(plf)
         colorRow(s3, "Name Color", "NameColor")
         colorRow(s3, "Tracer Color", "TracerColor")
         colorRow(s3, "LookTracer Color", "LookTracerColor")
+        colorRow(s3, "Head Dot Color", "HeadDotColor")
+        colorRow(s3, "Glow Color", "GlowColor")
+        colorRow(s3, "Arrow Color", "ArrowColor")
+        colorRow(s3, "Weapon Color", "WeaponColor")
+        numInput(s3, "Head Dot Size", "HeadDotSize", 4)
+        numInput(s3, "Arrow Size", "ArrowSize", 12)
+        slider(s3, "Glow Trans", "GlowTransparency", 0, 1, 0.75, function(v) cfg.GlowTransparency = v end, 2)
         numInput(s3, "LookTracer Length", "LookTracerLength", 15)
         slider(s3, "LookTracer Transparency", "LookTracerTransparency", 0, 1, 1, function(v) cfg.LookTracerTransparency = v end, 2)
         toggle(s3, "Animate LookTracer", "LookTracerAnimate", false, function(v) cfg.LookTracerAnimate = v end)
@@ -3148,13 +3180,17 @@ function StartScript(plf)
             for _, d in pairs(dr) do
                 pcall(function() if d.B then d.B:Remove() end end)
                 pcall(function() if d.BF then d.BF:Remove() end end)
+                pcall(function() if d.Glow then d.Glow:Remove() end end)
                 pcall(function() if d.Name then d.Name:Remove() end end)
+                pcall(function() if d.Weapon then d.Weapon:Remove() end end)
                 pcall(function() if d.HB then d.HB:Remove() end end)
                 pcall(function() if d.HM then d.HM:Remove() end end)
                 pcall(function() if d.HPText then d.HPText:Remove() end end)
                 pcall(function() if d.D then d.D:Remove() end end)
                 pcall(function() if d.T then d.T:Remove() end end)
                 pcall(function() if d.LT then d.LT:Remove() end end)
+                pcall(function() if d.HeadDot then d.HeadDot:Remove() end end)
+                pcall(function() if d.Arrow then d.Arrow:Remove() end end)
                 for _, l in pairs(d.L) do pcall(function() if l then l:Remove() end end) end
                 for _, l in pairs(d.C_Lines) do pcall(function() if l then l:Remove() end end) end
             end
@@ -3164,7 +3200,13 @@ function StartScript(plf)
             pcall(function() if glowStroke then glowStroke:Destroy() end end)
             pcall(function() if glow then glow:Destroy() end end)
             pcall(function() fC:Remove() end); pcall(function() fS:Remove() end); pcall(function() fT:Remove() end)
-            for _, d in pairs(hitChams) do pcall(function() d.sq:Remove() end) end
+            for _, d in pairs(hitChams) do
+                pcall(function() if d.fill then d.fill:Remove() end end)
+                pcall(function() if d.outline then d.outline:Remove() end end)
+                pcall(function() if d.cross1 then d.cross1:Remove() end end)
+                pcall(function() if d.cross2 then d.cross2:Remove() end end)
+                pcall(function() if d.sq then d.sq:Remove() end end)
+            end
             for _, o in ipairs(crosshairParts) do pcall(function() o:Remove() end) end
             if SEC.ks then pcall(function() SEC.ks.sg:Destroy() end); SEC.ks = nil end
             if SEC.kf then pcall(function() SEC.kf.sg:Destroy() end); SEC.kf = nil end
@@ -3579,22 +3621,54 @@ function StartScript(plf)
         local function mkLine() local l; pcall(function() l = Drawing.new("Line") end); return l end
         local function mkSquare() local sq; pcall(function() sq = Drawing.new("Square") end); return sq end
         local function mkText() local t; pcall(function() t = Drawing.new("Text") end); return t end
+        local function mkCircle() local c; pcall(function() c = Drawing.new("Circle") end); return c end
+        local function mkTri() local t; pcall(function() t = Drawing.new("Triangle") end); return t end
         local d = {
-            L={}, B=mkSquare(), BF=mkSquare(), HB=mkLine(), HM=mkLine(), HPText=mkText(), D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(),
+            L={}, B=mkSquare(), BF=mkSquare(), Glow=mkSquare(),
+            HB=mkLine(), HM=mkLine(), HPText=mkText(),
+            D=mkText(), T=mkLine(), LT=mkLine(), Name=mkText(), Weapon=mkText(),
+            HeadDot=mkCircle(), Arrow=mkTri(),
             C_Lines = {},
         }
         if d.B then d.B.Thickness, d.B.Color, d.B.Filled = cfg.BoxThickness, cfg.BoxColor, false end
         if d.BF then d.BF.Thickness, d.BF.Color, d.BF.Filled, d.BF.Transparency = 0, cfg.BoxFilledColor, true, cfg.BoxFilledTransparency end
+        if d.Glow then
+            d.Glow.Filled = true
+            d.Glow.Thickness = 0
+            d.Glow.Color = cfg.GlowColor or Color3.fromRGB(150,130,255)
+            d.Glow.Transparency = cfg.GlowTransparency or 0.75
+            d.Glow.Visible = false
+        end
         if d.HB then d.HB.Thickness, d.HB.Color = cfg.HealthThickness + 2, Color3.new(0,0,0) end
         if d.HM then d.HM.Thickness, d.HM.Color = cfg.HealthThickness, cfg.HealthColor end
-        if d.HPText then d.HPText.Size, d.HPText.Center, d.HPText.Color = 12, true, cfg.HealthColor; d.HPText.Outline = true; d.HPText.OutlineColor = Color3.new(0,0,0) end
-        if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor end
+        if d.HPText then
+            d.HPText.Size, d.HPText.Center, d.HPText.Color = 12, true, cfg.HealthColor
+            d.HPText.Outline = true; d.HPText.OutlineColor = Color3.new(0,0,0)
+        end
+        if d.D then d.D.Size, d.D.Center, d.D.Color = cfg.ESPFontSize, true, cfg.DistanceColor; d.D.Outline = true; d.D.OutlineColor = Color3.new(0,0,0) end
         if d.T then d.T.Thickness, d.T.Color = cfg.TracerThickness, cfg.TracerColor end
         if d.LT then d.LT.Thickness, d.LT.Color = cfg.LookTracerThickness, cfg.LookTracerColor end
         if d.Name then
             d.Name.Size, d.Name.Center, d.Name.Color = cfg.NameSize, true, cfg.NameColor
-            d.Name.Outline = true
-            d.Name.OutlineColor = Color3.new(0,0,0)
+            d.Name.Outline = true; d.Name.OutlineColor = Color3.new(0,0,0)
+        end
+        if d.Weapon then
+            d.Weapon.Size, d.Weapon.Center, d.Weapon.Color = 11, true, cfg.WeaponColor or Color3.fromRGB(255,200,80)
+            d.Weapon.Outline = true; d.Weapon.OutlineColor = Color3.new(0,0,0)
+            d.Weapon.Visible = false
+        end
+        if d.HeadDot then
+            d.HeadDot.Filled = true
+            d.HeadDot.NumSides = 16
+            d.HeadDot.Thickness = 1
+            d.HeadDot.Color = cfg.HeadDotColor or Color3.fromRGB(255,255,255)
+            d.HeadDot.Visible = false
+        end
+        if d.Arrow then
+            d.Arrow.Filled = true
+            d.Arrow.Thickness = 1
+            d.Arrow.Color = cfg.ArrowColor or Color3.fromRGB(255,80,80)
+            d.Arrow.Visible = false
         end
         for i = 1, 8 do
             local l = mkLine()
@@ -3635,32 +3709,130 @@ function StartScript(plf)
     end
 
     local function pushCham(pl)
-        local ex = hitChams[pl]; if ex then ex.expiresAt = tick() + 2; return end
-        local sq; pcall(function() sq = Drawing.new("Square") end); if not sq then return end
-        sq.Thickness, sq.Filled, sq.Color, sq.Transparency, sq.Visible = 2, true, Color3.fromRGB(0,255,140), 0.65, true
-        hitChams[pl] = {sq = sq, expiresAt = tick() + 2}
+        local ex = hitChams[pl]
+        if ex then
+            ex.expiresAt = tick() + 1.6
+            -- pulse intensity on re-hit
+            ex.pulse = 1
+            return
+        end
+        local fill, outline, cross1, cross2
+        pcall(function()
+            fill = Drawing.new("Square")
+            outline = Drawing.new("Square")
+            cross1 = Drawing.new("Line")
+            cross2 = Drawing.new("Line")
+        end)
+        if not fill then return end
+
+        fill.Filled = true
+        fill.Thickness = 0
+        fill.Color = Color3.fromRGB(0, 255, 160)
+        fill.Transparency = 0.55
+        fill.Visible = true
+
+        if outline then
+            outline.Filled = false
+            outline.Thickness = 2.5
+            outline.Color = Color3.fromRGB(180, 255, 220)
+            outline.Transparency = 0.15
+            outline.Visible = true
+        end
+        if cross1 then
+            cross1.Thickness = 1.5
+            cross1.Color = Color3.fromRGB(255, 255, 255)
+            cross1.Transparency = 0.2
+            cross1.Visible = true
+        end
+        if cross2 then
+            cross2.Thickness = 1.5
+            cross2.Color = Color3.fromRGB(255, 255, 255)
+            cross2.Transparency = 0.2
+            cross2.Visible = true
+        end
+
+        hitChams[pl] = {
+            fill = fill,
+            outline = outline,
+            cross1 = cross1,
+            cross2 = cross2,
+            expiresAt = tick() + 1.6,
+            pulse = 1,
+            born = tick()
+        }
     end
+
     local function updateChams()
         if next(hitChams) == nil then return end
-        local now = tick(); local hide = root.Visible
+        local now = tick()
+        local hide = root.Visible
         for pl, data in pairs(hitChams) do
-            if now > data.expiresAt or hide then
-                pcall(function() data.sq:Remove() end); hitChams[pl] = nil
+            local life = data.expiresAt - now
+            if life <= 0 or hide then
+                pcall(function() if data.fill then data.fill:Remove() end end)
+                pcall(function() if data.outline then data.outline:Remove() end end)
+                pcall(function() if data.cross1 then data.cross1:Remove() end end)
+                pcall(function() if data.cross2 then data.cross2:Remove() end end)
+                hitChams[pl] = nil
             else
                 local ch = pl.Character
-                if ch then
+                if not ch then
+                    if data.fill then data.fill.Visible = false end
+                    if data.outline then data.outline.Visible = false end
+                    if data.cross1 then data.cross1.Visible = false end
+                    if data.cross2 then data.cross2.Visible = false end
+                else
                     local hrp = ch:FindFirstChild("HumanoidRootPart")
-                    if hrp then
+                    if not hrp then
+                        if data.fill then data.fill.Visible = false end
+                        if data.outline then data.outline.Visible = false end
+                    else
                         local ps, on = c:WorldToViewportPoint(hrp.Position)
                         local tS = c:WorldToViewportPoint(hrp.Position + V3_HEAD)
                         local bS = c:WorldToViewportPoint(hrp.Position - V3_FEET)
-                        local h = math.abs(bS.Y - tS.Y); local w = h / 1.6
-                        data.sq.Size = Vector2.new(w, h)
-                        data.sq.Position = Vector2.new(ps.X - w/2, tS.Y)
-                        data.sq.Visible = on and ps.Z > 0
-                        data.sq.Transparency = 0.65 * math.clamp((data.expiresAt - now) / 2, 0, 1)
-                    else data.sq.Visible = false end
-                else data.sq.Visible = false end
+                        local h = math.abs(bS.Y - tS.Y)
+                        local w = h / 1.55
+                        local visible = on and ps.Z > 0
+
+                        -- fade + slight pulse
+                        local fade = math.clamp(life / 1.6, 0, 1)
+                        local pulse = 0.85 + 0.15 * math.sin((now - data.born) * 14)
+                        local alpha = fade * pulse
+
+                        if data.fill then
+                            data.fill.Size = Vector2.new(w, h)
+                            data.fill.Position = Vector2.new(ps.X - w/2, tS.Y)
+                            data.fill.Visible = visible
+                            data.fill.Transparency = 1 - (0.5 * alpha)
+                            data.fill.Color = Color3.fromRGB(
+                                math.floor(0 + 40 * (1-fade)),
+                                math.floor(255 * fade + 180 * (1-fade)),
+                                math.floor(160 * fade + 80 * (1-fade))
+                            )
+                        end
+                        if data.outline then
+                            data.outline.Size = Vector2.new(w + 4, h + 4)
+                            data.outline.Position = Vector2.new(ps.X - (w+4)/2, tS.Y - 2)
+                            data.outline.Visible = visible
+                            data.outline.Transparency = 1 - (0.85 * alpha)
+                        end
+                        if data.cross1 and data.cross2 and visible then
+                            local cx, cy = ps.X, (tS.Y + bS.Y) * 0.5
+                            local arm = math.min(w, h) * 0.22
+                            data.cross1.From = Vector2.new(cx - arm, cy)
+                            data.cross1.To   = Vector2.new(cx + arm, cy)
+                            data.cross1.Visible = true
+                            data.cross1.Transparency = 1 - (0.9 * alpha)
+                            data.cross2.From = Vector2.new(cx, cy - arm)
+                            data.cross2.To   = Vector2.new(cx, cy + arm)
+                            data.cross2.Visible = true
+                            data.cross2.Transparency = 1 - (0.9 * alpha)
+                        elseif data.cross1 then
+                            data.cross1.Visible = false
+                            if data.cross2 then data.cross2.Visible = false end
+                        end
+                    end
+                end
             end
         end
     end
@@ -3910,7 +4082,7 @@ function StartScript(plf)
         end
         updateChams()
 
-        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone or cName)
+        local anyESP = (not menuOpen) and (cBox or cBoxFilled or cHealth or cDist or cTracer or cLookTr or cBone or cName or cfg.HeadDot or cfg.OffscreenArrows or cfg.WeaponESP or cfg.GlowBox)
         for pl, d in pairs(dr) do
             local ch = pl.Character
             local visible = anyESP and ch and v_cached(pl)
@@ -3983,6 +4155,73 @@ function StartScript(plf)
                                 d.BF.Transparency = cBoxFillTrans
                             elseif d.BF.Visible then d.BF.Visible = false end
                         end
+
+                        -- Glow box
+                        if d.Glow then
+                            if cfg.GlowBox then
+                                d.Glow.Visible = true
+                                d.Glow.Size = Vector2.new(wd + 10, ht + 10)
+                                d.Glow.Position = Vector2.new(psx - (wd+10)*0.5, tSy - 5)
+                                d.Glow.Color = cfg.GlowColor or Color3.fromRGB(150,130,255)
+                                d.Glow.Transparency = cfg.GlowTransparency or 0.75
+                            else
+                                d.Glow.Visible = false
+                            end
+                        end
+
+                        -- Head dot
+                        if d.HeadDot then
+                            if cfg.HeadDot then
+                                local head = ch:FindFirstChild("Head")
+                                if head then
+                                    local hp2, onH = c:WorldToViewportPoint(head.Position)
+                                    if onH and hp2.Z > 0 then
+                                        d.HeadDot.Visible = true
+                                        d.HeadDot.Position = Vector2.new(hp2.X, hp2.Y)
+                                        d.HeadDot.Radius = cfg.HeadDotSize or 4
+                                        d.HeadDot.Color = cfg.HeadDotColor or Color3.fromRGB(255,255,255)
+                                    else
+                                        d.HeadDot.Visible = false
+                                    end
+                                else
+                                    d.HeadDot.Visible = false
+                                end
+                            else
+                                d.HeadDot.Visible = false
+                            end
+                        end
+
+                        -- Weapon ESP
+                        if d.Weapon then
+                            if cfg.WeaponESP then
+                                local toolName = nil
+                                local tool = ch:FindFirstChildOfClass("Tool")
+                                if tool then
+                                    toolName = tool.Name
+                                else
+                                    -- some games put tools in character differently
+                                    for _, child in ipairs(ch:GetChildren()) do
+                                        if child:IsA("Tool") or child:IsA("Model") and child:FindFirstChild("Handle") then
+                                            toolName = child.Name
+                                            break
+                                        end
+                                    end
+                                end
+                                if toolName then
+                                    d.Weapon.Visible = true
+                                    d.Weapon.Text = toolName
+                                    d.Weapon.Position = Vector2.new(psx, tSy + ht + 14)
+                                    d.Weapon.Color = cfg.WeaponColor or Color3.fromRGB(255,200,80)
+                                    d.Weapon.Size = 11
+                                else
+                                    d.Weapon.Visible = false
+                                end
+                            else
+                                d.Weapon.Visible = false
+                            end
+                        end
+
+                        if d.Arrow then d.Arrow.Visible = false end
 
                         if d.HB and d.HM and d.HPText then
                             if cHealth then
@@ -4115,6 +4354,9 @@ function StartScript(plf)
                     else
                         if d.B and d.B.Visible then d.B.Visible = false end
                         if d.BF and d.BF.Visible then d.BF.Visible = false end
+                        if d.Glow then d.Glow.Visible = false end
+                        if d.HeadDot then d.HeadDot.Visible = false end
+                        if d.Weapon then d.Weapon.Visible = false end
                         if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
                         if d.Name and d.Name.Visible then d.Name.Visible = false end
                         if d.D and d.D.Visible then d.D.Visible = false end
@@ -4127,11 +4369,44 @@ function StartScript(plf)
                             local ln = d.L[i]
                             if ln and ln.Visible then ln.Visible = false end
                         end
+                        -- Offscreen arrow
+                        if d.Arrow and cfg.OffscreenArrows and hrp then
+                            local dir = (hrpPos - camPos)
+                            local flat = Vector3.new(dir.X, 0, dir.Z)
+                            if flat.Magnitude > 0.1 then
+                                local look = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z)
+                                if look.Magnitude < 0.1 then look = Vector3.new(0,0,-1) end
+                                look = look.Unit
+                                local right = Vector3.new(-look.Z, 0, look.X)
+                                local localDir = Vector3.new(flat.Unit:Dot(right), 0, flat.Unit:Dot(look))
+                                local angle = math.atan2(localDir.X, -localDir.Z)
+                                local radius = math.min(vsx, vsy) * 0.42
+                                local ax = halfX + math.sin(angle) * radius
+                                local ay = halfY - math.cos(angle) * radius
+                                local size = cfg.ArrowSize or 12
+                                local tip = Vector2.new(ax + math.sin(angle) * size, ay - math.cos(angle) * size)
+                                local left = Vector2.new(ax + math.sin(angle + 2.5) * size * 0.6, ay - math.cos(angle + 2.5) * size * 0.6)
+                                local rightP = Vector2.new(ax + math.sin(angle - 2.5) * size * 0.6, ay - math.cos(angle - 2.5) * size * 0.6)
+                                d.Arrow.PointA = tip
+                                d.Arrow.PointB = left
+                                d.Arrow.PointC = rightP
+                                d.Arrow.Color = cfg.ArrowColor or Color3.fromRGB(255,80,80)
+                                d.Arrow.Visible = true
+                            else
+                                d.Arrow.Visible = false
+                            end
+                        elseif d.Arrow then
+                            d.Arrow.Visible = false
+                        end
                     end
                 end
             else
                 if d.B and d.B.Visible then d.B.Visible = false end
                 if d.BF and d.BF.Visible then d.BF.Visible = false end
+                if d.Glow then d.Glow.Visible = false end
+                if d.HeadDot then d.HeadDot.Visible = false end
+                if d.Weapon then d.Weapon.Visible = false end
+                if d.Arrow then d.Arrow.Visible = false end
                 if d.C_Lines then for i=1,8 do if d.C_Lines[i] then d.C_Lines[i].Visible = false end end end
                 if d.Name and d.Name.Visible then d.Name.Visible = false end
                 if d.D and d.D.Visible then d.D.Visible = false end
@@ -4443,42 +4718,182 @@ function StartScript(plf)
     end)
 
     task.spawn(function()
-        local lastT, lastHit = 0, 0
-        local trigRayParams = RaycastParams.new()
-        trigRayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        local lastFire = 0
+        local lastHitSound = 0
+
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+        rayParams.IgnoreWater = true
+
+        local function validTarget(pl)
+            if not pl or pl == p then return false end
+            local char = pl.Character
+            if not char then return false end
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if not hum or hum.Health <= 0 then return false end
+            if cfg.TeamCheck and pl.Team and p.Team and pl.Team == p.Team then return false end
+            if cfg.KOCheck then
+                local be = char:FindFirstChild("BodyEffects")
+                if be then
+                    for _, name in ipairs({"K.O", "KO", "Knocked", "Downed", "Dead", "Ragdoll"}) do
+                        local obj = be:FindFirstChild(name)
+                        if obj then
+                            if obj:IsA("BoolValue") and obj.Value then return false end
+                            if obj:IsA("StringValue") and obj.Value ~= "" and obj.Value ~= "None" then return false end
+                        end
+                    end
+                end
+                for _, attr in ipairs({"K.O", "KO", "Knocked", "IsKnocked", "Downed", "IsDowned", "Dead", "IsDead", "Ragdolled", "IsRagdolled"}) do
+                    local a = char:GetAttribute(attr)
+                    if a == true then return false end
+                end
+            end
+            return true
+        end
+
+        local function getFilter()
+            local list = {}
+            if p.Character then
+                table.insert(list, p.Character)
+            end
+            return list
+        end
+
+        local function tryGetPlayerFromPart(part)
+            if not part then return nil end
+            local model = part:FindFirstAncestorOfClass("Model")
+            if not model then return nil end
+            return P:GetPlayerFromCharacter(model)
+        end
+
+        -- PC click
+        local function clickPC(x, y)
+            -- method 1: classic
+            pcall(function()
+                VIM:SendMouseButtonEvent(x, y, 0, true, game, 1)
+                VIM:SendMouseButtonEvent(x, y, 0, false, game, 1)
+            end)
+            -- method 2: some executors
+            pcall(function()
+                VIM:SendMouseButtonEvent(x, y, 0, true, false, 1)
+                task.wait()
+                VIM:SendMouseButtonEvent(x, y, 0, false, false, 1)
+            end)
+            -- method 3: mouse1click if exposed
+            pcall(function()
+                if mouse1click then mouse1click() end
+            end)
+            pcall(function()
+                if mouse1press then
+                    mouse1press()
+                    task.wait(0.02)
+                    mouse1release()
+                end
+            end)
+        end
+
+        -- Mobile tap
+        local function clickMobile(x, y)
+            pcall(function()
+                VIM:SendTouchEvent(1, 0, x, y)   -- began
+                task.wait(0.02)
+                VIM:SendTouchEvent(1, 2, x, y)   -- ended
+            end)
+            pcall(function()
+                VIM:SendTouchEvent(99, 0, x, y)
+                task.wait(0.02)
+                VIM:SendTouchEvent(99, 2, x, y)
+            end)
+            -- some mobile executors
+            pcall(function()
+                if touchclick then touchclick(x, y) end
+            end)
+        end
+
+        local function doClick(x, y)
+            if plf == "Mobile" then
+                clickMobile(x, y)
+            else
+                clickPC(x, y)
+            end
+        end
+
         while g and g.Parent do
-            if cfg.Trig and not root.Visible then
+            local ok, err = pcall(function()
+                if not cfg.Trig then return end
+                if root and root.Visible then return end
+
                 local now = tick()
-                if now - lastT > cfg.Dly then
-                    local vs = c.ViewportSize
-                    local scx, scy = math.floor(vs.X*0.5), math.floor(vs.Y*0.5)
-                    local ray = c:ViewportPointToRay(scx, scy)
-                    trigRayParams.FilterDescendantsInstances = { p.Character }
-                    local result = workspace:Raycast(ray.Origin, ray.Direction * 1000, trigRayParams)
-                    if result and result.Instance then
-                        local model = result.Instance:FindFirstAncestorOfClass("Model")
-                        local hitPl = model and P:GetPlayerFromCharacter(model)
-                        if hitPl and v(hitPl) then
-                            local hd = (result.Position - ray.Origin).Magnitude
-                            if hd <= cfg.MaxTriggerDist then
-                                pcall(function()
-                                    if plf == "Mobile" then
-                                        VIM:SendTouchEvent(99, 0, scx, scy)
-                                        task.wait(0.02)
-                                        VIM:SendTouchEvent(99, 2, scx, scy)
-                                    else
-                                        VIM:SendMouseButtonEvent(scx, scy, 0, true, false, 1)
-                                        VIM:SendMouseButtonEvent(scx, scy, 0, false, false, 1)
-                                    end
-                                end)
-                                lastT = tick() + math.max(0.03, math.random() * cfg.RandDelay)
-                                killStats.hits = killStats.hits + 1
-                                if cfg.HitSound and hitSound and tick() - lastHit > 0.15 then hitSound:Play(); lastHit = tick() end
+                if now - lastFire < (cfg.Dly or 0.02) then return end
+
+                local cam = workspace.CurrentCamera
+                if not cam then return end
+                local vs = cam.ViewportSize
+                local cx = math.floor(vs.X * 0.5)
+                local cy = math.floor(vs.Y * 0.5)
+
+                rayParams.FilterDescendantsInstances = getFilter()
+
+                local maxDist = cfg.MaxTriggerDist or 500
+                local hitPlayer = nil
+                local hitDistance = math.huge
+
+                -- center ray first
+                local origin = cam.CFrame.Position
+                local dir = cam.CFrame.LookVector
+                local result = workspace:Raycast(origin, dir * maxDist, rayParams)
+
+                if result and result.Instance then
+                    local pl = tryGetPlayerFromPart(result.Instance)
+                    if pl and validTarget(pl) then
+                        hitPlayer = pl
+                        hitDistance = (result.Position - origin).Magnitude
+                    end
+                end
+
+                -- if center missed, sample a tight cross (helps thin hitboxes)
+                if not hitPlayer then
+                    local offsets = {
+                        Vector2.new( 3,  0), Vector2.new(-3,  0),
+                        Vector2.new( 0,  3), Vector2.new( 0, -3),
+                        Vector2.new( 2,  2), Vector2.new(-2, -2),
+                        Vector2.new( 2, -2), Vector2.new(-2,  2),
+                    }
+                    for i = 1, #offsets do
+                        local off = offsets[i]
+                        local ray = cam:ViewportPointToRay(cx + off.X, cy + off.Y)
+                        local res = workspace:Raycast(ray.Origin, ray.Direction * maxDist, rayParams)
+                        if res and res.Instance then
+                            local pl = tryGetPlayerFromPart(res.Instance)
+                            if pl and validTarget(pl) then
+                                hitPlayer = pl
+                                hitDistance = (res.Position - ray.Origin).Magnitude
+                                break
                             end
                         end
                     end
                 end
+
+                if hitPlayer and hitDistance <= maxDist then
+                    doClick(cx, cy)
+                    lastFire = now + math.max(0.02, (math.random() * (cfg.RandDelay or 0.04)))
+                    killStats.hits = (killStats.hits or 0) + 1
+
+                    if cfg.HitSound and hitSound and (now - lastHitSound) > 0.1 then
+                        pcall(function() hitSound:Play() end)
+                        lastHitSound = now
+                    end
+
+                    if cfg.Chams then
+                        pcall(function() pushCham(hitPlayer) end)
+                    end
+                end
+            end)
+
+            if not ok then
+                warn("[zeva trigger]", err)
             end
+
             RS.Heartbeat:Wait()
         end
     end)
@@ -4488,19 +4903,30 @@ function StartScript(plf)
         if d then
             pcall(function() if d.B then d.B:Remove() end end)
             pcall(function() if d.BF then d.BF:Remove() end end)
+            pcall(function() if d.Glow then d.Glow:Remove() end end)
             pcall(function() if d.Name then d.Name:Remove() end end)
+            pcall(function() if d.Weapon then d.Weapon:Remove() end end)
             pcall(function() if d.HB then d.HB:Remove() end end)
             pcall(function() if d.HM then d.HM:Remove() end end)
             pcall(function() if d.HPText then d.HPText:Remove() end end)
             pcall(function() if d.D then d.D:Remove() end end)
             pcall(function() if d.T then d.T:Remove() end end)
             pcall(function() if d.LT then d.LT:Remove() end end)
+            pcall(function() if d.HeadDot then d.HeadDot:Remove() end end)
+            pcall(function() if d.Arrow then d.Arrow:Remove() end end)
             for _, l in pairs(d.L) do pcall(function() if l then l:Remove() end end) end
             for _, l in pairs(d.C_Lines) do pcall(function() if l then l:Remove() end end) end
             dr[pl] = nil
         end
         local hc = hitChams[pl]
-        if hc then pcall(function() hc.sq:Remove() end); hitChams[pl] = nil end
+        if hc then
+            pcall(function() if hc.fill then hc.fill:Remove() end end)
+            pcall(function() if hc.outline then hc.outline:Remove() end end)
+            pcall(function() if hc.cross1 then hc.cross1:Remove() end end)
+            pcall(function() if hc.cross2 then hc.cross2:Remove() end end)
+            pcall(function() if hc.sq then hc.sq:Remove() end end)
+            hitChams[pl] = nil
+        end
         lastHealth[pl] = nil; velHist[pl] = nil; validityCache[pl] = nil
         local ch = pl.Character
         if ch then koCache[ch] = nil; bh_restoreCharacter(ch) end

@@ -400,7 +400,7 @@ local function ripple(parent, x, y)
 end
 
 local KEY_WHITELIST = {
-    ["zevadenganteng"] = { "zevadenalt" },
+    ["zevadenganteng"] = { "zevadenabcd" },
     ["ardananjing"]    = { "andymunoz" },
     ["u"] = { "unique_ocelot95" },
 }

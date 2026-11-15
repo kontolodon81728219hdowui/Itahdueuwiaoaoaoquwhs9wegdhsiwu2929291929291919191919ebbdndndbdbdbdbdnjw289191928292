@@ -402,7 +402,7 @@ end
 local KEY_WHITELIST = {
     ["z"] = { "zevadenabcd" },
     ["7657-28"]    = { "tq_dm" },
-    ["u"] = { "unique_ocelot835" },
+    ["rey"] = { "floppagod057" },
 }
 local function keyName(k)
     if k == nil then return "None" end

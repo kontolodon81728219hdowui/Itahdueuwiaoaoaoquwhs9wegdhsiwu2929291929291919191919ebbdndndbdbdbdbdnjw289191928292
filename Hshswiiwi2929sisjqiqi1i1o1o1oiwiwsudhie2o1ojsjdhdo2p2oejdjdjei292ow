@@ -401,7 +401,7 @@ end
 
 local KEY_WHITELIST = {
     ["z"] = { "zevadenabcd" },
-    ["ardananjing"]    = { "andymunoz" },
+    ["7657-28"]    = { "tq_dm" },
     ["u"] = { "unique_ocelot835" },
 }
 local function keyName(k)
